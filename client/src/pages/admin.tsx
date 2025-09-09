@@ -40,9 +40,7 @@ export default function Admin() {
   const section = params.section || "login";
   
   const [loginData, setLoginData] = useState({ username: "", password: "" });
-  const [totpCode, setTotpCode] = useState("");
-  const [authState, setAuthState] = useState<"login" | "totp-setup" | "totp-verify" | "authenticated">("login");
-  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [authState, setAuthState] = useState<"login" | "authenticated">("login");
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -67,21 +65,12 @@ export default function Admin() {
     mutationFn: async (credentials: { username: string; password: string }) => {
       return apiRequest("POST", "/api/admin/login", credentials);
     },
-    onSuccess: async (response: any) => {
-      if (response.requiresTotp) {
-        if (!response.isSetup) {
-          // Need to setup TOTP
-          const setupResponse = await apiRequest("POST", "/api/admin/setup-totp");
-          const data = await setupResponse.json();
-          setQrCodeUrl(data.qrCode);
-          setAuthState("totp-setup");
-        } else {
-          // Just verify TOTP
-          setAuthState("totp-verify");
-        }
-      } else {
-        setAuthState("authenticated");
-      }
+    onSuccess: () => {
+      setAuthState("authenticated");
+      toast({
+        title: "Authentication successful",
+        description: "Welcome to the admin panel",
+      });
     },
     onError: () => {
       toast({
@@ -92,26 +81,7 @@ export default function Admin() {
     },
   });
 
-  // TOTP verification mutation
-  const totpMutation = useMutation({
-    mutationFn: async (token: string) => {
-      return apiRequest("POST", "/api/admin/verify-totp", { token });
-    },
-    onSuccess: () => {
-      setAuthState("authenticated");
-      toast({
-        title: "Authentication successful",
-        description: "Welcome to the admin panel",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Verification failed",
-        description: "Invalid verification code",
-        variant: "destructive",
-      });
-    },
-  });
+  
 
   // Logout mutation
   const logoutMutation = useMutation({
@@ -121,7 +91,6 @@ export default function Admin() {
     onSuccess: () => {
       setAuthState("login");
       setLoginData({ username: "", password: "" });
-      setTotpCode("");
       queryClient.clear();
     },
   });
@@ -165,10 +134,7 @@ export default function Admin() {
     loginMutation.mutate(loginData);
   };
 
-  const handleTotpVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    totpMutation.mutate(totpCode);
-  };
+  
 
   const downloadInvoice = (orderId: string) => {
     window.open(`/api/admin/orders/${orderId}/invoice`, '_blank');
@@ -233,65 +199,7 @@ export default function Admin() {
     );
   }
 
-  // Render TOTP setup/verification
-  if (authState === "totp-setup" || authState === "totp-verify") {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
-        <Card className="max-w-md w-full mx-4" data-testid="form-totp-verification">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Two-Factor Authentication</CardTitle>
-            <p className="text-muted-foreground">
-              {authState === "totp-setup" 
-                ? "Scan the QR code with your authenticator app" 
-                : "Enter your verification code"}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {authState === "totp-setup" && qrCodeUrl && (
-              <div className="text-center">
-                <img 
-                  src={qrCodeUrl} 
-                  alt="TOTP QR Code" 
-                  className="mx-auto border rounded-lg"
-                  data-testid="img-totp-qr-code"
-                />
-                <p className="text-sm text-muted-foreground mt-2">
-                  Scan this QR code with your authenticator app
-                </p>
-              </div>
-            )}
-
-            <form onSubmit={handleTotpVerify}>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="totp">Verification Code</Label>
-                  <Input
-                    id="totp"
-                    type="text"
-                    maxLength={6}
-                    className="text-center text-lg tracking-widest"
-                    placeholder="000000"
-                    value={totpCode}
-                    onChange={(e) => setTotpCode(e.target.value)}
-                    data-testid="input-totp-code"
-                  />
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                  disabled={totpMutation.isPending || totpCode.length !== 6}
-                  data-testid="button-verify-totp"
-                >
-                  {totpMutation.isPending ? "Verifying..." : "Verify & Continue"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  
 
   // Render admin dashboard
   return (

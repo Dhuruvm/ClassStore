@@ -115,13 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Order request body:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
 
-      // Verify reCAPTCHA (skip in development)
-      if (validatedData.recaptchaToken && validatedData.recaptchaToken !== "dummy-token") {
-        const isRecaptchaValid = await RecaptchaService.verifyToken(validatedData.recaptchaToken);
-        if (!isRecaptchaValid) {
-          return res.status(400).json({ message: "reCAPTCHA verification failed" });
-        }
-      }
+      // CAPTCHA verification removed for simplified authentication
 
       // Get product details
       const product = await storage.getProduct(validatedData.productId);
@@ -187,50 +181,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       req.session.adminId = admin.id;
-      req.session.requiresTotp = true;
+      req.session.isAuthenticated = true;
 
       res.json({ 
-        message: "Authentication successful", 
-        requiresTotp: true,
-        isSetup: admin.isSetup 
+        message: "Authentication successful"
       });
     } catch (error) {
       res.status(500).json({ message: "Authentication failed" });
-    }
-  });
-
-  app.post("/api/admin/setup-totp", async (req, res) => {
-    try {
-      if (!req.session.adminId || !req.session.requiresTotp) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const { secret, qrCode } = await AuthService.setupAdminTotp(req.session.adminId);
-      res.json({ qrCode });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to setup TOTP" });
-    }
-  });
-
-  app.post("/api/admin/verify-totp", async (req, res) => {
-    try {
-      const { token } = req.body;
-
-      if (!req.session.adminId || !req.session.requiresTotp) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const isValid = await AuthService.completeTotpSetup(req.session.adminId, token);
-      if (!isValid) {
-        return res.status(400).json({ message: "Invalid verification code" });
-      }
-
-      req.session.isAuthenticated = true;
-      req.session.requiresTotp = false;
-
-      res.json({ message: "TOTP verified successfully" });
-    } catch (error) {
-      res.status(500).json({ message: "TOTP verification failed" });
     }
   });
 
