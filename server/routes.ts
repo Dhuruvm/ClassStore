@@ -112,6 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Order routes
   app.post("/api/orders", async (req, res) => {
     try {
+      console.log("Order request body:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
       
       // Verify reCAPTCHA (skip in development)
