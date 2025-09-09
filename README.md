@@ -64,7 +64,7 @@ A complete e-commerce platform for students to buy and sell textbooks, supplies,
    SMTP_USER=your-email@gmail.com
    SMTP_PASS=your-gmail-app-password
    RECAPTCHA_SECRET=your-recaptcha-secret-key
-   ADMIN_URL_PART=generate-long-random-string-for-security
+   # ADMIN_URL_PART removed - now hardcoded for security
    ```
 
 3. **Set up database**
@@ -82,7 +82,7 @@ A complete e-commerce platform for students to buy and sell textbooks, supplies,
 
 ### First Time Setup
 
-1. **Admin Access**: Navigate to `/admin/your-admin-url-part`
+1. **Admin Access**: Navigate to `/admin/z3XJbf0x0vXsCxnUZnscBRsnE`
    - Username: `admin`  
    - Password: `ChangeMe123!`
    - **⚠️ CHANGE IMMEDIATELY** after first login
@@ -116,8 +116,7 @@ Get Gmail App Password:
 
 #### Security Configuration
 ```env
-# Generate a strong random string for admin URL
-ADMIN_URL_PART=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+# Admin URL uses hardcoded secure hash: z3XJbf0x0vXsCxnUZnscBRsnE
 
 # Generate secure session secret
 SESSION_SECRET=$(openssl rand -base64 64)

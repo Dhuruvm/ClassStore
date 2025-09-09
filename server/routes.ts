@@ -45,7 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", (req, res, next) => {
     const uploadsPath = path.join(process.cwd(), "server", "uploads");
     const filePath = path.join(uploadsPath, req.path);
-    
+
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
     } else {
@@ -58,7 +58,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const classFilter = req.query.class ? parseInt(req.query.class as string) : undefined;
       const sortBy = req.query.sort as string;
-      
+
       let products = classFilter 
         ? await storage.getProductsByClass(classFilter)
         : await storage.getProducts();
@@ -102,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const newLikes = (product.likes || 0) + 1;
       await storage.updateProductLikes(req.params.id, newLikes);
-      
+
       res.json({ likes: newLikes });
     } catch (error) {
       res.status(500).json({ message: "Failed to update likes" });
@@ -114,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Order request body:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
-      
+
       // Verify reCAPTCHA (skip in development)
       if (validatedData.recaptchaToken && validatedData.recaptchaToken !== "dummy-token") {
         const isRecaptchaValid = await RecaptchaService.verifyToken(validatedData.recaptchaToken);
@@ -132,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create order
       const orderData = { ...validatedData };
       delete (orderData as any).recaptchaToken;
-      
+
       const order = await storage.createOrder(orderData);
 
       // Send emails (skip in development if no email config)
@@ -168,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validatedData = insertProductSchema.parse(productData);
       const product = await storage.createProduct(validatedData);
-      
+
       res.status(201).json({ message: "Product listed successfully", productId: product.id });
     } catch (error) {
       console.error("Seller registration error:", error);
@@ -180,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      
+
       const admin = await AuthService.authenticateAdmin(username, password);
       if (!admin) {
         return res.status(401).json({ message: "Invalid credentials" });
@@ -215,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/verify-totp", async (req, res) => {
     try {
       const { token } = req.body;
-      
+
       if (!req.session.adminId || !req.session.requiresTotp) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -282,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/orders/:id/invoice", requireAdminAuth, async (req, res) => {
     try {
       const invoicePath = path.join(process.cwd(), "server", "invoices", `${req.params.id}.pdf`);
-      
+
       if (fs.existsSync(invoicePath)) {
         res.download(invoicePath);
       } else {
@@ -297,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orders = await storage.getOrders();
       const products = await storage.getProducts();
-      
+
       const totalOrders = orders.length;
       const pendingOrders = orders.filter(o => o.status === "pending").length;
       const revenue = orders
@@ -320,7 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/confirm/:orderId", async (req, res) => {
     try {
       await storage.updateOrderStatus(req.params.orderId, "confirmed");
-      res.redirect(`${process.env.SITE_URL || 'http://localhost:5000'}/admin/${process.env.ADMIN_URL_PART || 'dashboard'}`);
+      res.redirect(`${process.env.SITE_URL || 'http://localhost:5000'}/admin/z3XJbf0x0vXsCxnUZnscBRsnE`);
     } catch (error) {
       res.status(500).send("Failed to confirm order");
     }
@@ -329,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/cancel/:orderId", async (req, res) => {
     try {
       await storage.updateOrderStatus(req.params.orderId, "cancelled");
-      res.redirect(`${process.env.SITE_URL || 'http://localhost:5000'}/admin/${process.env.ADMIN_URL_PART || 'dashboard'}`);
+      res.redirect(`${process.env.SITE_URL || 'http://localhost:5000'}/admin/z3XJbf0x0vXsCxnUZnscBRsnE`);
     } catch (error) {
       res.status(500).send("Failed to cancel order");
     }
