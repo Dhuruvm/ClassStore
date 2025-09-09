@@ -9,62 +9,77 @@ export default function Navigation() {
   const [searchQuery, setSearchQuery] = useState("");
   const likedCount = JSON.parse(localStorage.getItem("likedProducts") || "[]").length;
 
+  const navItems = ["New", "Men", "Women", "Kids", "Sale"];
+
   return (
-    <nav className="professional-nav sticky top-0 z-50 shadow-xl border-0">
+    <nav className="bg-white sticky top-0 z-50 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo - Nike style bold, minimal */}
           <div className="flex items-center space-x-8">
-            <div className="flex-shrink-0">
-              <Link href="/" data-testid="link-home">
-                <h1 className="text-3xl font-bold gradient-text cursor-pointer tracking-tight">
-                  ClassStore
-                </h1>
-              </Link>
-            </div>
-            <div className="hidden lg:block">
-              <div className="relative group">
-                <Input
-                  type="text"
-                  placeholder="Search for textbooks, supplies..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-80 pl-12 pr-4 h-12 bg-white/50 border-white/30 backdrop-blur-sm rounded-full focus:bg-white/80 transition-all duration-300 shadow-md"
-                  data-testid="input-search"
-                />
-                <Search className="absolute left-4 top-4 h-4 w-4 text-gray-500 group-focus-within:text-blue-600 transition-colors" />
-              </div>
+            <Link href="/" data-testid="link-home">
+              <h1 className="text-2xl font-black tracking-tighter text-black uppercase">
+                ClassStore
+              </h1>
+            </Link>
+            
+            {/* Nike-style navigation menu */}
+            <div className="hidden lg:flex space-x-8">
+              {navItems.map((item) => (
+                <Link key={item} href={item === "New" ? "/" : `/${item.toLowerCase()}`}>
+                  <span className="text-black font-medium hover:text-gray-600 transition-colors duration-200 cursor-pointer uppercase tracking-wide text-sm">
+                    {item}
+                  </span>
+                </Link>
+              ))}
             </div>
           </div>
           
-          <div className="flex items-center space-x-6">
-            <button className="lg:hidden p-3 rounded-full bg-white/50 backdrop-blur-sm hover:bg-white/80 transition-all duration-300" data-testid="button-mobile-search">
-              <Search className="h-5 w-5 text-gray-600" />
+          {/* Search Bar - Nike minimal style */}
+          <div className="hidden md:block flex-1 max-w-md mx-8">
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 h-10 bg-gray-50 border-0 rounded-full focus:bg-white focus:ring-2 focus:ring-black transition-all duration-200"
+                data-testid="input-search"
+              />
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+            </div>
+          </div>
+          
+          {/* Right side icons - Nike minimal */}
+          <div className="flex items-center space-x-4">
+            <button className="md:hidden" data-testid="button-mobile-search">
+              <Search className="h-6 w-6 text-black" />
             </button>
             
             <Link href="/sell">
               <Button 
-                className={`h-12 px-6 rounded-full font-semibold transition-all duration-300 ${
+                className={`text-sm font-medium transition-colors duration-200 ${
                   location === "/sell" 
-                    ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105" 
-                    : "bg-white/50 text-gray-700 hover:bg-white/80 border border-white/30"
+                    ? "nike-btn" 
+                    : "nike-btn-secondary"
                 }`}
                 data-testid="button-sell"
               >
-                + Sell Item
+                Sell
               </Button>
             </Link>
             
-            <button className="relative p-3 rounded-full bg-white/50 backdrop-blur-sm hover:bg-white/80 transition-all duration-300 group" data-testid="button-favorites">
-              <Heart className="h-5 w-5 text-gray-600 group-hover:text-red-500 transition-colors" />
+            <button className="relative" data-testid="button-favorites">
+              <Heart className="h-6 w-6 text-black hover:text-gray-600 transition-colors duration-200" />
               {likedCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shadow-lg animate-pulse" data-testid="text-liked-count">
+                <span className="absolute -top-2 -right-2 bg-black text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" data-testid="text-liked-count">
                   {likedCount}
                 </span>
               )}
             </button>
             
-            <button className="p-3 rounded-full bg-white/50 backdrop-blur-sm hover:bg-white/80 transition-all duration-300" data-testid="button-profile">
-              <UserCircle className="h-6 w-6 text-gray-600" />
+            <button data-testid="button-profile">
+              <UserCircle className="h-6 w-6 text-black hover:text-gray-600 transition-colors duration-200" />
             </button>
           </div>
         </div>
