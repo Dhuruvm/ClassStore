@@ -84,7 +84,7 @@ A complete e-commerce platform for students to buy and sell textbooks, supplies,
 
 1. **Admin Access**: Navigate to `/admin/z3XJbf0x0vXsCxnUZnscBRsnE`
    - Username: `admin`  
-   - Password: `ChangeMe123!`
+   - Password: `password`
    - **⚠️ CHANGE IMMEDIATELY** after first login
 
 2. **TOTP Setup**: Follow the QR code setup for 2FA using an authenticator app

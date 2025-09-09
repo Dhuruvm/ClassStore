@@ -6,20 +6,20 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   // Product methods
   getProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProductLikes(id: string, likes: number): Promise<void>;
   getProductsByClass(classNum: number): Promise<Product[]>;
-  
+
   // Order methods
   getOrders(): Promise<(Order & { product: Product })[]>;
   getOrder(id: string): Promise<(Order & { product: Product }) | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrderStatus(id: string, status: "pending" | "confirmed" | "cancelled"): Promise<void>;
-  
+
   // Admin methods
   getAdmin(id: string): Promise<Admin | undefined>;
   getAdminByUsername(username: string): Promise<Admin | undefined>;
@@ -107,12 +107,12 @@ export class MemStorage implements IStorage {
       this.products.set(product.id, product);
     });
 
-    // Create admin user
+    // Create admin user - generate fresh hash
     const adminId = randomUUID();
     this.admins.set(adminId, {
       id: adminId,
       username: "admin",
-      password: "$2b$10$rQqLFjZhF9Z2qF4n3P4zKuF7t5d6z2tQ8r5v7y9W1x2z4c5v6b7n8", // ChangeMe123!
+      password: "$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // password
       totpSecret: null,
       isSetup: false,
     });
