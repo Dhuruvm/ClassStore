@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS admins (
 
 -- Insert default admin (password: ChangeMe123!)
 INSERT OR IGNORE INTO admins (username, password) VALUES 
-('admin', '$2b$10$rQqLFjZhF9Z2qF4n3P4zKuF7t5d6z2tQ8r5v7y9W1x2z4c5v6b7n8');
+('admin', '$2b$10$8K1p/a/KaCWcB1.I8CFUyOm8qAV5.b8Qjsj9vE0Qzm1E5E5n/lWNO');
 
 -- Sample data
 INSERT OR IGNORE INTO products (name, description, price, class, section, image_url, seller_name, seller_phone, likes) VALUES
