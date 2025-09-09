@@ -80,27 +80,28 @@ export default function PurchaseModal({ product, isOpen, onClose, onSuccess }: P
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="modal-purchase">
-        <DialogHeader>
-          <DialogTitle>Purchase Item</DialogTitle>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl" data-testid="modal-purchase">
+        <DialogHeader className="text-center pb-6">
+          <DialogTitle className="text-2xl font-bold gradient-text">Complete Your Purchase</DialogTitle>
+          <p className="text-gray-600">Fill in your details to buy this item</p>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Product Summary */}
-          <div className="bg-muted rounded-lg p-4 mb-6">
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 mb-6 border border-blue-100">
             <div className="flex items-center space-x-4">
               <img 
                 src={product.imageUrl || "https://images.unsplash.com/photo-1509228468518-180dd4864904?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80"} 
                 alt={product.name}
-                className="w-16 h-16 object-cover rounded-md"
+                className="w-20 h-20 object-cover rounded-xl shadow-lg"
                 data-testid="img-product-summary"
               />
-              <div>
-                <h4 className="font-semibold" data-testid="text-product-name">{product.name}</h4>
-                <p className="text-sm text-muted-foreground" data-testid="text-product-details">
+              <div className="flex-1">
+                <h4 className="font-bold text-lg text-gray-800" data-testid="text-product-name">{product.name}</h4>
+                <p className="text-sm text-gray-600 font-medium" data-testid="text-product-details">
                   Grade {product.class} - Section {product.section}
                 </p>
-                <p className="text-lg font-bold text-secondary" data-testid="text-product-price">
+                <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent" data-testid="text-product-price">
                   ${product.price}
                 </p>
               </div>
@@ -109,34 +110,35 @@ export default function PurchaseModal({ product, isOpen, onClose, onSuccess }: P
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="buyerName">Full Name *</Label>
+              <Label htmlFor="buyerName" className="font-semibold text-gray-700">Full Name *</Label>
               <Input 
                 id="buyerName"
                 type="text" 
                 required 
                 value={formData.buyerName}
                 onChange={(e) => handleInputChange("buyerName", e.target.value)}
+                className="h-12 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                 data-testid="input-buyer-name"
               />
             </div>
             <div>
-              <Label htmlFor="buyerClass">Class *</Label>
+              <Label htmlFor="buyerClass" className="font-semibold text-gray-700">Class *</Label>
               <Select 
                 value={formData.buyerClass} 
                 onValueChange={(value) => handleInputChange("buyerClass", value)}
                 required
               >
-                <SelectTrigger data-testid="select-buyer-class">
+                <SelectTrigger className="h-12 rounded-xl border-gray-200" data-testid="select-buyer-class">
                   <SelectValue placeholder="Select Class" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="6">Grade 6</SelectItem>
-                  <SelectItem value="7">Grade 7</SelectItem>
-                  <SelectItem value="8">Grade 8</SelectItem>
-                  <SelectItem value="9">Grade 9</SelectItem>
-                  <SelectItem value="10">Grade 10</SelectItem>
-                  <SelectItem value="11">Grade 11</SelectItem>
-                  <SelectItem value="12">Grade 12</SelectItem>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-white/20 rounded-xl">
+                  <SelectItem value="6">🎯 Grade 6</SelectItem>
+                  <SelectItem value="7">🎯 Grade 7</SelectItem>
+                  <SelectItem value="8">🎯 Grade 8</SelectItem>
+                  <SelectItem value="9">🎯 Grade 9</SelectItem>
+                  <SelectItem value="10">🎯 Grade 10</SelectItem>
+                  <SelectItem value="11">🎯 Grade 11</SelectItem>
+                  <SelectItem value="12">🎯 Grade 12</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -186,23 +188,23 @@ export default function PurchaseModal({ product, isOpen, onClose, onSuccess }: P
             </div>
           </div>
 
-          <div className="flex space-x-4 pt-4">
+          <div className="flex space-x-4 pt-6">
             <Button 
               type="button" 
               variant="outline" 
               onClick={onClose}
-              className="flex-1"
+              className="flex-1 h-12 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50"
               data-testid="button-cancel-order"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
-              className="flex-1"
+              className="flex-1 h-12 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300"
               disabled={orderMutation.isPending}
               data-testid="button-submit-order"
             >
-              {orderMutation.isPending ? "Processing..." : "Complete Purchase"}
+              {orderMutation.isPending ? "Processing..." : "🛒 Complete Purchase"}
             </Button>
           </div>
         </form>
