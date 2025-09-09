@@ -35,8 +35,12 @@ export const orders = pgTable("orders", {
   buyerSection: text("buyer_section").notNull(),
   buyerEmail: text("buyer_email").notNull(),
   buyerPhone: text("buyer_phone").notNull(),
+  buyerAddress: text("buyer_address").notNull(),
+  buyerCity: text("buyer_city").notNull(),
+  buyerPincode: text("buyer_pincode").notNull(),
+  deliveryInstructions: text("delivery_instructions"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  status: text("status", { enum: ["pending", "confirmed", "cancelled"] }).default("pending"),
+  status: text("status", { enum: ["pending", "confirmed", "delivered", "cancelled"] }).default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -58,6 +62,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
   likes: true,
   isActive: true,
+  isSoldOut: true,
   createdAt: true,
 }).extend({
   class: z.number().min(6).max(12),
@@ -73,6 +78,10 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   buyerClass: z.string().transform((val) => parseInt(val)).pipe(z.number().min(6).max(12)),
   buyerEmail: z.string().email(),
   buyerPhone: z.string().min(10),
+  buyerAddress: z.string().min(5),
+  buyerCity: z.string().min(2),
+  buyerPincode: z.string().min(6).max(6),
+  deliveryInstructions: z.string().optional(),
   amount: z.string().regex(/^\d+(\.\d{2})?$/).transform((val) => parseFloat(val)),
   recaptchaToken: z.string().optional(),
 });
