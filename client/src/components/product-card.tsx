@@ -46,77 +46,101 @@ export default function ProductCard({ product, onPurchase }: ProductCardProps) {
     }
   };
 
+  const getStatusLabel = () => {
+    if (product.isSoldOut) return "Sold Out";
+    if (product.createdAt && new Date(product.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000) {
+      return "Just In";
+    }
+    return "Promo Exclusion";
+  };
+
+  const getStatusColor = () => {
+    if (product.isSoldOut) return "bg-gray-500";
+    return "bg-red-500";
+  };
+
   return (
     <div 
-      className="nike-card overflow-hidden"
+      className={`bg-white transition-all duration-300 ${product.isSoldOut ? 'opacity-60' : 'hover:shadow-md'}`}
       data-testid={`card-product-${product.id}`}
     >
-      {/* Image Container - Nike style: large, prominent product image */}
-      <div className="relative overflow-hidden aspect-square">
+      {/* Image Container - Exact Nike mobile design */}
+      <div className="relative">
         <img 
           src={product.imageUrl || "https://images.unsplash.com/photo-1509228468518-180dd4864904?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400"} 
           alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+          className="w-full h-80 object-cover" 
           data-testid={`img-product-${product.id}`}
         />
         
-        {/* Like Button - Nike minimal style */}
+        {/* Status Label - Exact Nike style */}
+        <div className={`absolute top-4 left-4 ${getStatusColor()} text-white px-3 py-1 text-xs font-semibold`}>
+          {getStatusLabel()}
+        </div>
+
+        {/* Like Button */}
         <button 
           onClick={handleLike}
-          className={`absolute top-4 right-4 w-10 h-10 flex items-center justify-center transition-all duration-200 ${
+          disabled={product.isSoldOut}
+          className={`absolute top-4 right-4 w-8 h-8 flex items-center justify-center transition-all duration-200 ${
             isLiked 
               ? "text-red-500" 
               : "text-gray-400 hover:text-gray-600"
-          }`}
+          } ${product.isSoldOut ? 'cursor-not-allowed' : ''}`}
           data-testid={`button-like-${product.id}`}
         >
-          <Heart className={`h-6 w-6 ${isLiked ? "fill-current" : ""}`} />
+          <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
         </button>
-
-        {/* Class Badge - Nike minimal style */}
-        <div className="absolute top-4 left-4 bg-black text-white px-3 py-1 text-xs font-bold tracking-wide uppercase" data-testid={`text-class-${product.id}`}>
-          Grade {product.class}
-        </div>
       </div>
 
-      {/* Content - Nike minimal style */}
-      <div className="p-6">
-        <div className="mb-3">
-          <h3 
-            className="font-bold text-xl text-black mb-1 line-clamp-2 leading-tight" 
-            data-testid={`text-name-${product.id}`}
-          >
-            {product.name}
-          </h3>
-          <p 
-            className="text-sm text-gray-500 uppercase tracking-wide font-medium" 
-            data-testid={`text-section-${product.id}`}
-          >
-            Section {product.section}
-          </p>
-        </div>
-
-        {/* Price - Nike style bold pricing */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <span className="text-2xl font-black text-black" data-testid={`text-price-${product.id}`}>
-              ${product.price}
-            </span>
-          </div>
-          <div className="flex items-center space-x-1 text-gray-400">
-            <span className="text-sm font-medium">{product.likes || 0}</span>
-            <Heart className="h-4 w-4 fill-current" />
-          </div>
-        </div>
-
-        {/* Buy Button - Nike style */}
-        <Button 
-          onClick={() => onPurchase(product)}
-          className="nike-btn w-full"
-          data-testid={`button-buy-${product.id}`}
+      {/* Content - Exact Nike style from screenshot */}
+      <div className="p-4">
+        {/* Product Name - Exact Nike typography */}
+        <h3 
+          className="text-lg font-semibold text-black mb-1 leading-tight" 
+          data-testid={`text-name-${product.id}`}
         >
-          Add to Cart
-        </Button>
+          {product.name}
+        </h3>
+        
+        {/* Category/Description - Nike style secondary text */}
+        <p 
+          className="text-gray-500 text-sm mb-1" 
+          data-testid={`text-category-${product.id}`}
+        >
+          {product.category || "Student Item"} • Grade {product.class}
+        </p>
+        
+        {/* Color indicator - Nike style */}
+        <p className="text-gray-500 text-sm mb-3">
+          1 Colour
+        </p>
+
+        {/* Price - Exact Nike format: MRP : ₹ price */}
+        <div className="mb-4">
+          <span className="text-black font-semibold text-lg" data-testid={`text-price-${product.id}`}>
+            MRP : ₹ {product.price}
+          </span>
+        </div>
+
+        {/* Buy Button or Sold Out Status */}
+        {product.isSoldOut ? (
+          <Button 
+            disabled
+            className="w-full bg-gray-300 text-gray-500 cursor-not-allowed font-semibold py-3 rounded-full"
+            data-testid={`button-soldout-${product.id}`}
+          >
+            SOLD OUT
+          </Button>
+        ) : (
+          <Button 
+            onClick={() => onPurchase(product)}
+            className="w-full bg-black text-white hover:bg-gray-800 font-semibold py-3 rounded-full transition-colors duration-200"
+            data-testid={`button-buy-${product.id}`}
+          >
+            BUY NOW
+          </Button>
+        )}
       </div>
     </div>
   );

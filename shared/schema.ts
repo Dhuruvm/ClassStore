@@ -21,6 +21,9 @@ export const products = pgTable("products", {
   sellerPhone: text("seller_phone").notNull(),
   likes: integer("likes").default(0),
   isActive: boolean("is_active").default(true),
+  isSoldOut: boolean("is_sold_out").default(false),
+  category: text("category").default("General"),
+  condition: text("condition").default("Good"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
