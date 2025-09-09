@@ -190,6 +190,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const order: Order = {
       ...insertOrder,
+      amount: typeof insertOrder.amount === 'number' ? insertOrder.amount.toString() : insertOrder.amount,
       id,
       status: "pending",
       createdAt: new Date(),
