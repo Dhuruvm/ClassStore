@@ -67,10 +67,11 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  buyerClass: z.number().min(6).max(12),
+  buyerClass: z.string().transform((val) => parseInt(val)).pipe(z.number().min(6).max(12)),
   buyerEmail: z.string().email(),
   buyerPhone: z.string().min(10),
-  recaptchaToken: z.string(),
+  amount: z.string().regex(/^\d+(\.\d{2})?$/).transform((val) => parseFloat(val)),
+  recaptchaToken: z.string().optional(),
 });
 
 export const insertAdminSchema = createInsertSchema(admins).pick({

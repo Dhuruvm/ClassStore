@@ -64,8 +64,8 @@ export default function PurchaseModal({ product, isOpen, onClose, onSuccess }: P
     const orderData = {
       productId: product.id,
       ...formData,
-      buyerClass: parseInt(formData.buyerClass),
-      amount: product.price,
+      buyerClass: formData.buyerClass,
+      amount: product.price.toString(),
       recaptchaToken: "dummy-token", // In production, get from reCAPTCHA widget
     };
 
@@ -80,10 +80,10 @@ export default function PurchaseModal({ product, isOpen, onClose, onSuccess }: P
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl" data-testid="modal-purchase">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl" data-testid="modal-purchase" aria-describedby="purchase-dialog-description">
         <DialogHeader className="text-center pb-6">
           <DialogTitle className="text-2xl font-bold gradient-text">Complete Your Purchase</DialogTitle>
-          <p className="text-gray-600">Fill in your details to buy this item</p>
+          <p id="purchase-dialog-description" className="text-gray-600">Fill in your details to buy this item</p>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
