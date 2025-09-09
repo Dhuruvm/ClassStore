@@ -1,0 +1,52 @@
+You are a full-stack project generator. Build a complete, runnable web-store project called "ClassStore" that matches these exact requirements. Produce code, run scripts, and a README. Deliverables must include a working frontend (React + Tailwind), backend (Node/Express), SQLite DB with migrations, and a working admin panel with TOTP 2FA. Do the following tasks automatically:
+
+1. Project structure
+- Create a monorepo with `client/` (React + Tailwind) and `server/` (Node + Express).
+- Include a top-level `package.json` with scripts to run both client and server in dev.
+
+2. Frontend
+- List products on homepage using /api/products.
+- Product card component with image, class badge, like button, and Buy button. Use Tailwind, responsive layout.
+- Order page flows:
+  - Form fields: name, class (dropdown with options 6,7,8,9,10,11,12), section, email, phone, captcha input placeholder.
+  - Integrate Google reCAPTCHA (placeholder keys in `.env`).
+  - On success show an animated tick (SVG with draw + tailwind animation), show success message then redirect to `/`.
+- Seller form page (accessible via `/sell`): upload image, product name, price, class, section, name, phone. Show commission breakdown (20%).
+- Use localStorage to persist likes. Show product ranking on product list page.
+- Include `client/.env.example` with placeholders: REACT_APP_API_URL, REACT_APP_RECAPTCHA_KEY, SITE_URL.
+
+3. Backend
+- Express server with routes: /api/products, /api/product/:id, /api/orders, /api/sellers, /api/admin/*
+- Use SQLite for persistence with migrations or a simple SQL file `migrations/init.sql` to create tables described in the spec.
+- Use multer to accept image uploads to `uploads/` directory.
+- Implement sending email with Nodemailer. Use `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` in `.env`.
+- Implement function `generateInvoicePDF(order_id, product, buyer)` that writes invoice to `invoices/<order_id>.pdf` using pdfkit or similar.
+- Implement reCAPTCHA server-side verification stub that uses `RECAPTCHA_SECRET` env var.
+- Implement admin login route that issues session cookie (use express-session) and then requires 2FA verification. Use speakeasy to create TOTP secret and qrcode to display a QR code endpoint for setup.
+- Implement admin endpoints: list orders, confirm, cancel, download invoice, get stats (product ranking).
+
+4. Security & env
+- `.env.example` with all env placeholders.
+- Admin initial seed: create an admin user with username `admin` and password `ChangeMe123!` and generate TOTP secret for first-time setup. Put instructions in README to change immediately.
+- For production explain how to setup SPF/DKIM for a custom domain and recommend SendGrid/Postmark for deliverability.
+
+5. UX & polish
+- Include Tailwind animations and the tick success effect (SVG stroke animation).
+- Buttons Confirm/Cancel in admin emails should be functional links to protected admin endpoints (list how to use tokens or login cookie).
+- Include client form validation and server validation (email format, phone pattern, required fields).
+
+6. README
+- Full setup steps to run locally in Replit: install, set `.env`, run migrations, seed admin, start client and server.
+- List env variables and where to place keys (Gmail App Password example).
+- Explain how to change admin URL to a hass-type URL (generate long random string in .env ADMIN_URL_PART).
+- Provide notes about deliverability and how to move to SendGrid.
+
+7. Tests
+- Provide a few simple integration tests or Postman collection to test placing an order and admin confirm API.
+
+8. Output
+- After scaffolding, run `npm run dev` (or equivalent) and produce a zip of the project or instructions to open in Replit. Add example .db (seeded with a few products and the admin) so the user can test instantly.
+
+Make code clean, documented, and comment blocking critical parts. Use only dependency packages that are MIT permissive and common (express, sqlite3, knex or better-sqlite3, nodemailer, multer, speakeasy, qrcode, pdfkit, bcrypt, cors, express-session). Produce readable code and ensure CORS is correctly handled. At the end of generation, output a short checklist of what was created and how the user (me) should test: place order, check admin email, confirm order, view invoice, seller forms.
+
+IMPORTANT: ensure all placeholder secrets are in `.env.example` and that code reads from process.env. For any part requiring keys (recaptcha, smtp), put placeholders and give the exact steps to obtain keys in README.
