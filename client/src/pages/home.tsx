@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import Navigation from "@/components/navigation";
 import ProductCard from "@/components/product-card";
 import PurchaseModal from "@/components/purchase-modal";
@@ -10,6 +11,7 @@ import { Product } from "@shared/schema";
 import { Grid, List } from "lucide-react";
 
 export default function Home() {
+  const [, setLocation] = useLocation();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -31,8 +33,7 @@ export default function Home() {
   });
 
   const handlePurchase = (product: Product) => {
-    setSelectedProduct(product);
-    setShowPurchaseModal(true);
+    setLocation(`/order/${product.id}`);
   };
 
   const handlePurchaseSuccess = () => {
