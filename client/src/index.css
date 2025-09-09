@@ -3,36 +3,40 @@
 @tailwind utilities;
 
 :root {
-  --background: linear-gradient(135deg, hsl(210, 40%, 98%) 0%, hsl(220, 50%, 96%) 100%);
-  --foreground: hsl(210, 15%, 8%);
+  /* Nike-inspired color scheme: Black, White, Gray with bold accents */
+  --background: hsl(0, 0%, 98%);
+  --foreground: hsl(0, 0%, 10%);
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(210, 15%, 8%);
+  --card-foreground: hsl(0, 0%, 10%);
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(210, 15%, 8%);
-  --primary: linear-gradient(135deg, hsl(233, 88%, 64%) 0%, hsl(221, 83%, 53%) 100%);
-  --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: linear-gradient(135deg, hsl(158, 70%, 58%) 0%, hsl(151, 64%, 48%) 100%);
-  --secondary-foreground: hsl(0, 0%, 98%);
-  --muted: hsl(210, 40%, 96%);
-  --muted-foreground: hsl(210, 15%, 46%);
-  --accent: linear-gradient(135deg, hsl(43, 96%, 64%) 0%, hsl(38, 92%, 50%) 100%);
-  --accent-foreground: hsl(210, 15%, 8%);
+  --popover-foreground: hsl(0, 0%, 10%);
+  --primary: hsl(0, 0%, 0%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(0, 0%, 95%);
+  --secondary-foreground: hsl(0, 0%, 10%);
+  --muted: hsl(0, 0%, 96%);
+  --muted-foreground: hsl(0, 0%, 45%);
+  --accent: hsl(12, 100%, 55%);
+  --accent-foreground: hsl(0, 0%, 100%);
   --destructive: hsl(0, 84%, 60%);
   --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(214, 32%, 91%);
-  --input: hsl(214, 32%, 91%);
-  --ring: hsl(221, 83%, 53%);
+  --border: hsl(0, 0%, 88%);
+  --input: hsl(0, 0%, 88%);
+  --ring: hsl(0, 0%, 0%);
   
-  /* Class-based theme colors */
-  --grade-6: linear-gradient(135deg, hsl(200, 85%, 65%) 0%, hsl(200, 80%, 55%) 100%);
-  --grade-7: linear-gradient(135deg, hsl(280, 85%, 65%) 0%, hsl(280, 80%, 55%) 100%);
-  --grade-8: linear-gradient(135deg, hsl(120, 85%, 65%) 0%, hsl(120, 80%, 55%) 100%);
-  --grade-9: linear-gradient(135deg, hsl(45, 95%, 65%) 0%, hsl(45, 90%, 55%) 100%);
-  --grade-10: linear-gradient(135deg, hsl(330, 85%, 65%) 0%, hsl(330, 80%, 55%) 100%);
-  --grade-11: linear-gradient(135deg, hsl(15, 95%, 65%) 0%, hsl(15, 90%, 55%) 100%);
-  --grade-12: linear-gradient(135deg, hsl(260, 85%, 65%) 0%, hsl(260, 80%, 55%) 100%);
+  /* Nike-style accent colors */
+  --grade-6: hsl(0, 0%, 20%);
+  --grade-7: hsl(0, 0%, 20%);
+  --grade-8: hsl(0, 0%, 20%);
+  --grade-9: hsl(0, 0%, 20%);
+  --grade-10: hsl(0, 0%, 20%);
+  --grade-11: hsl(0, 0%, 20%);
+  --grade-12: hsl(0, 0%, 20%);
+  --nike-orange: hsl(12, 100%, 55%);
+  --nike-red: hsl(0, 100%, 50%);
+  --nike-volt: hsl(73, 100%, 50%);
   
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Helvetica Neue', 'Arial', system-ui, -apple-system, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: 'JetBrains Mono', monospace;
   --radius: 12px;
@@ -152,6 +156,27 @@
   .grade-12-theme { 
     background: var(--grade-12);
     color: white;
+  }
+  
+  /* Nike-style utility classes */
+  .nike-btn {
+    @apply bg-black text-white px-8 py-4 rounded-full font-bold tracking-wide uppercase text-sm hover:bg-gray-800 transition-all duration-200 transform hover:scale-105;
+  }
+  
+  .nike-btn-secondary {
+    @apply bg-white text-black border-2 border-black px-8 py-4 rounded-full font-bold tracking-wide uppercase text-sm hover:bg-black hover:text-white transition-all duration-200;
+  }
+  
+  .nike-card {
+    @apply bg-white shadow-sm hover:shadow-lg transition-all duration-300 group cursor-pointer;
+  }
+  
+  .nike-text-xl {
+    @apply text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight;
+  }
+  
+  .nike-text-hero {
+    @apply text-4xl md:text-6xl lg:text-7xl font-black tracking-tighter;
   }
   
   .hover-glow {
