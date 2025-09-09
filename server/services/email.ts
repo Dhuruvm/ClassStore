@@ -15,6 +15,30 @@ export class EmailService {
     });
   }
 
+  async verifyConnection() {
+    try {
+      await this.transporter.verify();
+      console.log("✓ Email service connection verified successfully");
+      return true;
+    } catch (error: any) {
+      console.error("✗ Email service connection failed");
+      
+      if (error.code === 'EAUTH') {
+        console.error("❌ Gmail Authentication Error:");
+        console.error("   1. Make sure 2-Factor Authentication is enabled on your Google account");
+        console.error("   2. Generate an App Password (NOT your regular Gmail password):");
+        console.error("      - Go to: Google Account Settings → Security → 2-Step Verification");
+        console.error("      - Create App Password for 'Mail'");
+        console.error("      - Use this 16-character password in SMTP_PASS");
+        console.error("   3. Check that SMTP_USER is your full Gmail address");
+      } else {
+        console.error("   Error details:", error.message);
+      }
+      
+      return false;
+    }
+  }
+
   async sendOrderConfirmation(order: any, product: any) {
     const mailOptions = {
       from: process.env.SMTP_FROM || "noreply@classstore.com",
@@ -29,7 +53,7 @@ export class EmailService {
           <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3>${product.name}</h3>
             <p><strong>Class:</strong> Grade ${product.class} - Section ${product.section}</p>
-            <p><strong>Price:</strong> $${order.amount}</p>
+            <p><strong>Price:</strong> ₹${order.amount}</p>
             <p><strong>Seller:</strong> ${product.sellerName}</p>
             <p><strong>Contact:</strong> ${product.sellerPhone}</p>
           </div>
@@ -65,7 +89,7 @@ export class EmailService {
             <p><strong>Class:</strong> Grade ${order.buyerClass} - Section ${order.buyerSection}</p>
             <p><strong>Email:</strong> ${order.buyerEmail}</p>
             <p><strong>Phone:</strong> ${order.buyerPhone}</p>
-            <p><strong>Amount:</strong> $${order.amount}</p>
+            <p><strong>Amount:</strong> ₹${order.amount}</p>
           </div>
 
           <div style="text-align: center; margin: 30px 0;">

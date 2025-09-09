@@ -38,6 +38,14 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+  
+  // Test email configuration at startup
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    const { emailService } = await import("./services/email");
+    await emailService.verifyConnection();
+  } else {
+    console.log("⚠️  Email configuration missing - emails will not be sent");
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

@@ -129,12 +129,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const order = await storage.createOrder(orderData);
 
-      // Send emails (skip in development if no email config)
+      // Send emails
       try {
+        console.log("📧 Attempting to send email notifications...");
         await emailService.sendOrderConfirmation(order, product);
+        console.log("✓ Order confirmation email sent to:", order.buyerEmail);
+        
         await emailService.sendSellerNotification(order, product);
+        console.log("✓ Seller notification email sent to admin");
       } catch (emailError: any) {
-        console.log("Email sending skipped in development:", emailError.message);
+        console.error("✗ Email sending failed:", emailError.message);
+        console.error("Email configuration check:", {
+          hasUser: !!process.env.SMTP_USER,
+          hasPass: !!process.env.SMTP_PASS,
+          hasFrom: !!process.env.SMTP_FROM,
+          hasAdmin: !!process.env.ADMIN_EMAIL
+        });
       }
 
       // Generate invoice (skip in development if no config)
