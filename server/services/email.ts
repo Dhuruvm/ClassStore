@@ -1,6 +1,6 @@
 import * as brevo from '@getbrevo/brevo';
 
-export class EmailService {
+export class EnhancedEmailService {
   private apiInstance: brevo.TransactionalEmailsApi;
   private apiKey: string;
 
@@ -219,4 +219,145 @@ export class EmailService {
   }
 }
 
-export const emailService = new EmailService();
+// Enhanced bulk email functionality
+interface BulkEmailTemplate {
+  subject: string;
+  htmlContent: string;
+  recipients: Array<{ email: string; name: string; }>;
+}
+
+interface EmailAnalytics {
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+  failed: number;
+}
+
+class EmailAnalyticsService {
+  private stats: EmailAnalytics = {
+    sent: 0,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+    bounced: 0,
+    failed: 0
+  };
+
+  trackSent() { this.stats.sent++; }
+  trackDelivered() { this.stats.delivered++; }
+  trackOpened() { this.stats.opened++; }
+  trackClicked() { this.stats.clicked++; }
+  trackBounced() { this.stats.bounced++; }
+  trackFailed() { this.stats.failed++; }
+
+  getStats(): EmailAnalytics {
+    return { ...this.stats };
+  }
+
+  reset() {
+    this.stats = { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 };
+  }
+}
+
+// Add enhanced methods to the existing service
+EnhancedEmailService.prototype.analytics = new EmailAnalyticsService();
+
+EnhancedEmailService.prototype.sendBulkEmails = async function(template: BulkEmailTemplate): Promise<{ success: number; failed: number }> {
+  let success = 0;
+  let failed = 0;
+
+  for (const recipient of template.recipients) {
+    try {
+      const sendSmtpEmail = new brevo.SendSmtpEmail();
+      sendSmtpEmail.to = [{ email: recipient.email, name: recipient.name }];
+      sendSmtpEmail.sender = { 
+        email: process.env.SMTP_FROM || "noreply@classstore.com", 
+        name: "ClassStore" 
+      };
+      sendSmtpEmail.subject = template.subject;
+      sendSmtpEmail.htmlContent = template.htmlContent.replace(/{{name}}/g, recipient.name);
+
+      await this.apiInstance.sendTransacEmail(sendSmtpEmail);
+      success++;
+      this.analytics.trackSent();
+    } catch (error) {
+      failed++;
+      this.analytics.trackFailed();
+      console.error(`Failed to send email to ${recipient.email}:`, error);
+    }
+  }
+
+  console.log(`📧 Bulk email complete: ${success} sent, ${failed} failed`);
+  return { success, failed };
+};
+
+EnhancedEmailService.prototype.sendWelcomeEmail = async function(userData: {
+  email: string;
+  name: string;
+  userType: 'buyer' | 'seller' | 'admin';
+}): Promise<boolean> {
+  const sendSmtpEmail = new brevo.SendSmtpEmail();
+  
+  sendSmtpEmail.to = [{ email: userData.email, name: userData.name }];
+  sendSmtpEmail.sender = { 
+    email: process.env.SMTP_FROM || "noreply@classstore.com", 
+    name: "ClassStore" 
+  };
+  sendSmtpEmail.subject = "Welcome to ClassStore - Your Student Marketplace! 🎓";
+  sendSmtpEmail.htmlContent = `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">🎓 Welcome to ClassStore!</h1>
+        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Hello ${userData.name}, you're all set as a ${userData.userType}!</p>
+      </div>
+      
+      <div style="padding: 40px 30px;">
+        <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+          Welcome to ClassStore - the ultimate marketplace for students! Whether you're buying textbooks, selling supplies, or trading gear, you're in the right place.
+        </p>
+        
+        <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 30px; margin: 30px 0;">
+          <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 22px; font-weight: 600;">🚀 What you can do:</h3>
+          <ul style="color: #374151; line-height: 1.8; padding-left: 20px;">
+            <li>Buy and sell textbooks, supplies, and equipment</li>
+            <li>Connect with students in your class and section</li>
+            <li>Browse products by class and category</li>
+            <li>Secure transactions and direct communication</li>
+            <li>Track your orders and sales history</li>
+          </ul>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.SITE_URL || 'http://localhost:5000'}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">🚀 Start Exploring</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    await this.apiInstance.sendTransacEmail(sendSmtpEmail);
+    this.analytics.trackSent();
+    console.log(`✅ Welcome email sent to ${userData.email}`);
+    return true;
+  } catch (error) {
+    this.analytics.trackFailed();
+    console.error("Failed to send welcome email:", error);
+    return false;
+  }
+};
+
+EnhancedEmailService.prototype.sendPromotionalEmail = async function(campaignData: {
+  subject: string;
+  content: string;
+  recipients: Array<{ email: string; name: string; }>;
+}): Promise<{ success: number; failed: number }> {
+  return await this.sendBulkEmails({
+    subject: campaignData.subject,
+    htmlContent: campaignData.content,
+    recipients: campaignData.recipients
+  });
+};
+
+export const emailService = new EnhancedEmailService();
