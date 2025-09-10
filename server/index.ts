@@ -6,6 +6,54 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Performance optimization middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Add cache control for static assets
+  if (req.path.startsWith('/assets/')) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year for assets
+  } else {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+  
+  // Add performance headers
+  res.setHeader('X-Powered-By', 'ClassStore');
+  
+  next();
+});
+
+// Simple rate limiting middleware (demonstration)
+const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowMs = 60000; // 1 minute window
+  const maxRequests = 100; // Max requests per window
+  
+  if (!rateLimitMap.has(clientIP)) {
+    rateLimitMap.set(clientIP, { count: 1, lastReset: now });
+  } else {
+    const clientData = rateLimitMap.get(clientIP)!;
+    
+    // Reset counter if window has passed
+    if (now - clientData.lastReset > windowMs) {
+      clientData.count = 1;
+      clientData.lastReset = now;
+    } else {
+      clientData.count++;
+    }
+    
+    // Check if rate limit exceeded
+    if (clientData.count > maxRequests) {
+      return res.status(429).json({ 
+        message: "Rate limit exceeded. Try again later.",
+        retryAfter: Math.ceil((windowMs - (now - clientData.lastReset)) / 1000)
+      });
+    }
+  }
+  
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -40,7 +88,7 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app);
   
   // Test email configuration at startup
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  if (process.env.BREVO_API_KEY || process.env.SENDGRID_API_KEY) {
     const { emailService } = await import("./services/email");
     await emailService.verifyConnection();
   } else {
