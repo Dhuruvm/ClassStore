@@ -57,6 +57,9 @@ export class MemStorage implements IStorage {
         sellerPhone: "+1234567890",
         likes: 15,
         isActive: true,
+        isSoldOut: false,
+        category: "Textbooks",
+        condition: "Excellent",
         createdAt: new Date(),
       },
       {
@@ -71,6 +74,9 @@ export class MemStorage implements IStorage {
         sellerPhone: "+1234567891",
         likes: 8,
         isActive: true,
+        isSoldOut: false,
+        category: "Stationery",
+        condition: "New",
         createdAt: new Date(),
       },
       {
@@ -85,6 +91,9 @@ export class MemStorage implements IStorage {
         sellerPhone: "+1234567892",
         likes: 23,
         isActive: true,
+        isSoldOut: false,
+        category: "Electronics",
+        condition: "Like New",
         createdAt: new Date(),
       },
       {
@@ -99,6 +108,9 @@ export class MemStorage implements IStorage {
         sellerPhone: "+1234567893",
         likes: 12,
         isActive: true,
+        isSoldOut: false,
+        category: "Lab Equipment",
+        condition: "Good",
         createdAt: new Date(),
       },
     ];
@@ -152,6 +164,7 @@ export class MemStorage implements IStorage {
       imageUrl: insertProduct.imageUrl || null,
       likes: 0,
       isActive: true,
+      isSoldOut: false,
       createdAt: new Date(),
     };
     this.products.set(id, product);
@@ -191,6 +204,7 @@ export class MemStorage implements IStorage {
     const order: Order = {
       ...insertOrder,
       amount: typeof insertOrder.amount === 'number' ? insertOrder.amount.toString() : insertOrder.amount,
+      deliveryInstructions: insertOrder.deliveryInstructions || null,
       id,
       status: "pending",
       createdAt: new Date(),
