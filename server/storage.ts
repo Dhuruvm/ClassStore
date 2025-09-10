@@ -162,6 +162,8 @@ export class MemStorage implements IStorage {
       id,
       description: insertProduct.description || null,
       imageUrl: insertProduct.imageUrl || null,
+      category: insertProduct.category || "General",
+      condition: insertProduct.condition || "Good",
       likes: 0,
       isActive: true,
       isSoldOut: false,
