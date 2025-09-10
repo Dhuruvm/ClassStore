@@ -168,12 +168,34 @@ export default function Admin() {
     },
   });
 
+  // Enhanced bulk operations - moved before early return
+  const bulkEmailMutation = useMutation({
+    mutationFn: async (emailData: { subject: string; content: string; recipients: string }) => {
+      return apiRequest("POST", "/api/admin/bulk-email", emailData);
+    },
+    onSuccess: (data) => {
+      toast({ title: "Bulk email sent", description: `Sent to ${data.success} recipients, ${data.failed} failed` });
+      setBulkEmailData({ subject: "", content: "", recipients: "" });
+    },
+    onError: () => {
+      toast({ title: "Bulk email failed", variant: "destructive" });
+    },
+  });
+
+  const systemOptimizationMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/optimize-system");
+    },
+    onSuccess: () => {
+      toast({ title: "System optimized successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/system-metrics"] });
+    },
+  });
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     loginMutation.mutate(loginData);
   };
-
-  
 
   const downloadInvoice = (orderId: string) => {
     window.open(`/api/admin/orders/${orderId}/invoice`, '_blank');
@@ -237,32 +259,6 @@ export default function Admin() {
       </div>
     );
   }
-
-  
-
-  // Enhanced bulk operations
-  const bulkEmailMutation = useMutation({
-    mutationFn: async (emailData: { subject: string; content: string; recipients: string }) => {
-      return apiRequest("POST", "/api/admin/bulk-email", emailData);
-    },
-    onSuccess: (data) => {
-      toast({ title: "Bulk email sent", description: `Sent to ${data.success} recipients, ${data.failed} failed` });
-      setBulkEmailData({ subject: "", content: "", recipients: "" });
-    },
-    onError: () => {
-      toast({ title: "Bulk email failed", variant: "destructive" });
-    },
-  });
-
-  const systemOptimizationMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/optimize-system");
-    },
-    onSuccess: () => {
-      toast({ title: "System optimized successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/system-metrics"] });
-    },
-  });
 
   // Render admin dashboard
   return (
