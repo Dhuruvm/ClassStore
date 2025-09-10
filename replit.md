@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Express.js with TypeScript**: RESTful API server with type safety
 - **Session-based Authentication**: Express sessions for admin authentication with TOTP 2FA using Speakeasy
 - **File Upload Handling**: Multer middleware for image uploads with validation and storage
-- **Email Service**: Nodemailer integration for order confirmations and seller notifications
+- **Email Service**: Omnisend API integration for transactional emails, order confirmations, and seller notifications
 - **PDF Generation**: PDFKit for automated invoice creation
 
 ### Data Storage Solutions
@@ -61,7 +61,7 @@ Preferred communication style: Simple, everyday language.
 
 ### File & Email Services
 - **multer**: File upload middleware for product images
-- **nodemailer**: Email delivery service for notifications
+- **axios**: HTTP client for Omnisend API integration
 - **pdfkit**: PDF document generation for invoices
 
 ### UI & Styling

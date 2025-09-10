@@ -88,11 +88,12 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app);
   
   // Test email configuration at startup
-  if (process.env.BREVO_API_KEY || process.env.SENDGRID_API_KEY) {
+  if (process.env.OMNISEND_API_KEY) {
     const { emailService } = await import("./services/email");
     await emailService.verifyConnection();
   } else {
     console.log("⚠️  Email configuration missing - emails will not be sent");
+    console.log("   Set OMNISEND_API_KEY environment variable to enable emails");
   }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

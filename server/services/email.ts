@@ -1,53 +1,137 @@
-import * as brevo from '@getbrevo/brevo';
+import axios, { AxiosInstance } from 'axios';
 
 export class EnhancedEmailService {
-  private apiInstance: brevo.TransactionalEmailsApi;
+  private apiClient: AxiosInstance;
   private apiKey: string;
 
   constructor() {
-    this.apiKey = process.env.BREVO_API_KEY || '';
+    this.apiKey = process.env.OMNISEND_API_KEY || '';
     
-    // Configure Brevo API with API key
-    this.apiInstance = new brevo.TransactionalEmailsApi();
-    this.apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, this.apiKey);
+    // Configure Omnisend API client
+    this.apiClient = axios.create({
+      baseURL: 'https://api.omnisend.com/v3',
+      headers: {
+        'X-API-KEY': this.apiKey,
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000
+    });
+
+    // Add response interceptor for error handling
+    this.apiClient.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response) {
+          console.error(`Omnisend API Error ${error.response.status}:`, error.response.data);
+        } else if (error.request) {
+          console.error('No response from Omnisend API:', error.request);
+        } else {
+          console.error('Request setup error:', error.message);
+        }
+        return Promise.reject(error);
+      }
+    );
   }
 
   async verifyConnection() {
     try {
       if (!this.apiKey) {
-        console.error("✗ Brevo API key not found");
-        console.error("❌ Brevo Configuration Required:");
-        console.error("   1. Sign up for Brevo account at https://brevo.com");
-        console.error("   2. Go to SMTP & API → API Keys");
+        console.error("✗ Omnisend API key not found");
+        console.error("❌ Omnisend Configuration Required:");
+        console.error("   1. Sign up for Omnisend account at https://omnisend.com");
+        console.error("   2. Go to Account → Integrations & API");
         console.error("   3. Create a new API key");
-        console.error("   4. Set BREVO_API_KEY environment variable");
+        console.error("   4. Set OMNISEND_API_KEY environment variable");
         return false;
       }
       
-      // Test API connection by getting account info
-      const accountApi = new brevo.AccountApi();
-      await accountApi.getAccount();
-      console.log("✓ Brevo email service connection verified successfully");
+      // Test API connection by getting brands info (lightweight endpoint)
+      await this.apiClient.get('/brands');
+      console.log("✓ Omnisend email service connection verified successfully");
       return true;
     } catch (error: any) {
-      console.error("✗ Brevo email service connection failed");
-      console.error("❌ Brevo API Error:");
-      console.error("   Please check your BREVO_API_KEY");
+      console.error("✗ Omnisend email service connection failed");
+      console.error("❌ Omnisend API Error:");
+      console.error("   Please check your OMNISEND_API_KEY");
       console.error("   Error details:", error.message);
       return false;
     }
   }
 
+  private async createOrUpdateContact(email: string, firstName: string = '', lastName: string = '') {
+    try {
+      // First, try to get the contact
+      const encodedEmail = encodeURIComponent(email);
+      let contactExists = false;
+      
+      try {
+        await this.apiClient.get(`/contacts/${encodedEmail}`);
+        contactExists = true;
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          contactExists = false;
+        } else {
+          throw error;
+        }
+      }
+
+      const contactData = {
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        status: 'subscribed'
+      };
+
+      if (contactExists) {
+        // Update existing contact
+        const response = await this.apiClient.patch(`/contacts/${encodedEmail}`, contactData);
+        return response.data;
+      } else {
+        // Create new contact
+        const response = await this.apiClient.post('/contacts', contactData);
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Error creating/updating contact:', error);
+      // Don't throw error, just log it as contact management is not critical for sending emails
+    }
+  }
+
+  private async sendTransactionalEmail(emailData: {
+    to: string;
+    toName: string;
+    subject: string;
+    htmlContent: string;
+    from?: string;
+    fromName?: string;
+  }) {
+    try {
+      // Create or update contact first
+      await this.createOrUpdateContact(emailData.to, emailData.toName);
+
+      // Send email using Omnisend's messaging API
+      const messageData = {
+        email: emailData.to,
+        subject: emailData.subject,
+        content: {
+          html: emailData.htmlContent
+        },
+        from: {
+          email: emailData.from || process.env.SMTP_FROM || "noreply@classstore.com",
+          name: emailData.fromName || "ClassStore"
+        }
+      };
+
+      const response = await this.apiClient.post('/messages', messageData);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to send transactional email:', error);
+      throw error;
+    }
+  }
+
   async sendOrderConfirmation(order: any, product: any) {
-    const sendSmtpEmail = new brevo.SendSmtpEmail();
-    
-    sendSmtpEmail.to = [{ email: order.buyerEmail, name: order.buyerName }];
-    sendSmtpEmail.sender = { 
-      email: process.env.SMTP_FROM || "noreply@classstore.com", 
-      name: "ClassStore" 
-    };
-    sendSmtpEmail.subject = `Order Confirmation - ${product.name}`;
-    sendSmtpEmail.htmlContent = `
+    const htmlContent = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
@@ -117,7 +201,12 @@ export class EnhancedEmailService {
     `;
 
     try {
-      const result = await this.apiInstance.sendTransacEmail(sendSmtpEmail);
+      const result = await this.sendTransactionalEmail({
+        to: order.buyerEmail,
+        toName: order.buyerName,
+        subject: `Order Confirmation - ${product.name}`,
+        htmlContent
+      });
       console.log("✓ Order confirmation email sent successfully");
       return result;
     } catch (error) {
@@ -131,18 +220,7 @@ export class EnhancedEmailService {
     const confirmUrl = `${adminUrl}/confirm/${order.id}`;
     const cancelUrl = `${adminUrl}/cancel/${order.id}`;
 
-    const sendSmtpEmail = new brevo.SendSmtpEmail();
-    
-    sendSmtpEmail.to = [{ 
-      email: process.env.ADMIN_EMAIL || process.env.SMTP_USER || "admin@classstore.com", 
-      name: "ClassStore Admin" 
-    }];
-    sendSmtpEmail.sender = { 
-      email: process.env.SMTP_FROM || "noreply@classstore.com", 
-      name: "ClassStore System" 
-    };
-    sendSmtpEmail.subject = `🛒 New Order Alert - ${product.name}`;
-    sendSmtpEmail.htmlContent = `
+    const htmlContent = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 30px; text-align: center;">
@@ -209,7 +287,13 @@ export class EnhancedEmailService {
     `;
 
     try {
-      const result = await this.apiInstance.sendTransacEmail(sendSmtpEmail);
+      const result = await this.sendTransactionalEmail({
+        to: process.env.ADMIN_EMAIL || process.env.SMTP_USER || "admin@classstore.com",
+        toName: "ClassStore Admin",
+        subject: `🛒 New Order Alert - ${product.name}`,
+        htmlContent,
+        fromName: "ClassStore System"
+      });
       console.log("✓ Admin notification email sent successfully");
       return result;
     } catch (error) {
@@ -217,6 +301,132 @@ export class EnhancedEmailService {
       throw error;
     }
   }
+
+  async sendWelcomeEmail(userData: {
+    email: string;
+    name: string;
+    userType: 'buyer' | 'seller' | 'admin';
+  }): Promise<boolean> {
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">🎓 Welcome to ClassStore!</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Hello ${userData.name}, you're all set as a ${userData.userType}!</p>
+        </div>
+        
+        <div style="padding: 40px 30px;">
+          <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+            Welcome to ClassStore - the ultimate marketplace for students! Whether you're buying textbooks, selling supplies, or trading gear, you're in the right place.
+          </p>
+          
+          <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 30px; margin: 30px 0;">
+            <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 22px; font-weight: 600;">🚀 What you can do:</h3>
+            <ul style="color: #374151; line-height: 1.8; padding-left: 20px;">
+              <li>Buy and sell textbooks, supplies, and equipment</li>
+              <li>Connect with students in your class and section</li>
+              <li>Browse products by class and category</li>
+              <li>Secure transactions and direct communication</li>
+              <li>Track your orders and sales history</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.SITE_URL || 'http://localhost:5000'}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">🚀 Start Exploring</a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      await this.sendTransactionalEmail({
+        to: userData.email,
+        toName: userData.name,
+        subject: "Welcome to ClassStore - Your Student Marketplace! 🎓",
+        htmlContent
+      });
+      
+      // Track the event in Omnisend for better segmentation
+      await this.triggerEvent(userData.email, 'user-registered', {
+        userType: userData.userType,
+        registrationDate: new Date().toISOString()
+      });
+      
+      console.log(`✅ Welcome email sent to ${userData.email}`);
+      return true;
+    } catch (error) {
+      console.error("Failed to send welcome email:", error);
+      return false;
+    }
+  }
+
+  async sendBulkEmails(template: BulkEmailTemplate): Promise<{ success: number; failed: number }> {
+    let success = 0;
+    let failed = 0;
+
+    for (const recipient of template.recipients) {
+      try {
+        await this.sendTransactionalEmail({
+          to: recipient.email,
+          toName: recipient.name,
+          subject: template.subject,
+          htmlContent: template.htmlContent.replace(/{{name}}/g, recipient.name)
+        });
+        success++;
+        this.analytics.trackSent();
+      } catch (error) {
+        failed++;
+        this.analytics.trackFailed();
+        console.error(`Failed to send email to ${recipient.email}:`, error);
+      }
+    }
+
+    console.log(`📧 Bulk email complete: ${success} sent, ${failed} failed`);
+    return { success, failed };
+  }
+
+  async sendPromotionalEmail(campaignData: {
+    subject: string;
+    content: string;
+    recipients: Array<{ email: string; name: string; }>;
+  }): Promise<{ success: number; failed: number }> {
+    return await this.sendBulkEmails({
+      subject: campaignData.subject,
+      htmlContent: campaignData.content,
+      recipients: campaignData.recipients
+    });
+  }
+
+  // Omnisend-specific event tracking
+  async triggerEvent(email: string, eventName: string, properties: any = {}) {
+    try {
+      const eventData = {
+        email: email,
+        eventName: eventName,
+        properties: properties
+      };
+
+      const response = await this.apiClient.post('/events', eventData);
+      console.log(`✓ Event '${eventName}' triggered for ${email}`);
+      return response.data;
+    } catch (error) {
+      console.error(`✗ Failed to trigger event '${eventName}' for ${email}:`, error);
+      // Don't throw error as event tracking is not critical
+    }
+  }
+
+  // Get email campaign analytics
+  async getCampaignStats(campaignId?: string) {
+    try {
+      const endpoint = campaignId ? `/campaigns/${campaignId}/stats` : '/campaigns/stats';
+      const response = await this.apiClient.get(endpoint);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get campaign stats:', error);
+      return null;
+    }
+  }
+
+  public analytics = new EmailAnalyticsService();
 }
 
 // Enhanced bulk email functionality
@@ -260,104 +470,5 @@ class EmailAnalyticsService {
     this.stats = { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 };
   }
 }
-
-// Add enhanced methods to the existing service
-EnhancedEmailService.prototype.analytics = new EmailAnalyticsService();
-
-EnhancedEmailService.prototype.sendBulkEmails = async function(template: BulkEmailTemplate): Promise<{ success: number; failed: number }> {
-  let success = 0;
-  let failed = 0;
-
-  for (const recipient of template.recipients) {
-    try {
-      const sendSmtpEmail = new brevo.SendSmtpEmail();
-      sendSmtpEmail.to = [{ email: recipient.email, name: recipient.name }];
-      sendSmtpEmail.sender = { 
-        email: process.env.SMTP_FROM || "noreply@classstore.com", 
-        name: "ClassStore" 
-      };
-      sendSmtpEmail.subject = template.subject;
-      sendSmtpEmail.htmlContent = template.htmlContent.replace(/{{name}}/g, recipient.name);
-
-      await this.apiInstance.sendTransacEmail(sendSmtpEmail);
-      success++;
-      this.analytics.trackSent();
-    } catch (error) {
-      failed++;
-      this.analytics.trackFailed();
-      console.error(`Failed to send email to ${recipient.email}:`, error);
-    }
-  }
-
-  console.log(`📧 Bulk email complete: ${success} sent, ${failed} failed`);
-  return { success, failed };
-};
-
-EnhancedEmailService.prototype.sendWelcomeEmail = async function(userData: {
-  email: string;
-  name: string;
-  userType: 'buyer' | 'seller' | 'admin';
-}): Promise<boolean> {
-  const sendSmtpEmail = new brevo.SendSmtpEmail();
-  
-  sendSmtpEmail.to = [{ email: userData.email, name: userData.name }];
-  sendSmtpEmail.sender = { 
-    email: process.env.SMTP_FROM || "noreply@classstore.com", 
-    name: "ClassStore" 
-  };
-  sendSmtpEmail.subject = "Welcome to ClassStore - Your Student Marketplace! 🎓";
-  sendSmtpEmail.htmlContent = `
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">🎓 Welcome to ClassStore!</h1>
-        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Hello ${userData.name}, you're all set as a ${userData.userType}!</p>
-      </div>
-      
-      <div style="padding: 40px 30px;">
-        <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
-          Welcome to ClassStore - the ultimate marketplace for students! Whether you're buying textbooks, selling supplies, or trading gear, you're in the right place.
-        </p>
-        
-        <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 30px; margin: 30px 0;">
-          <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 22px; font-weight: 600;">🚀 What you can do:</h3>
-          <ul style="color: #374151; line-height: 1.8; padding-left: 20px;">
-            <li>Buy and sell textbooks, supplies, and equipment</li>
-            <li>Connect with students in your class and section</li>
-            <li>Browse products by class and category</li>
-            <li>Secure transactions and direct communication</li>
-            <li>Track your orders and sales history</li>
-          </ul>
-        </div>
-        
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.SITE_URL || 'http://localhost:5000'}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">🚀 Start Exploring</a>
-        </div>
-      </div>
-    </div>
-  `;
-
-  try {
-    await this.apiInstance.sendTransacEmail(sendSmtpEmail);
-    this.analytics.trackSent();
-    console.log(`✅ Welcome email sent to ${userData.email}`);
-    return true;
-  } catch (error) {
-    this.analytics.trackFailed();
-    console.error("Failed to send welcome email:", error);
-    return false;
-  }
-};
-
-EnhancedEmailService.prototype.sendPromotionalEmail = async function(campaignData: {
-  subject: string;
-  content: string;
-  recipients: Array<{ email: string; name: string; }>;
-}): Promise<{ success: number; failed: number }> {
-  return await this.sendBulkEmails({
-    subject: campaignData.subject,
-    htmlContent: campaignData.content,
-    recipients: campaignData.recipients
-  });
-};
 
 export const emailService = new EnhancedEmailService();
