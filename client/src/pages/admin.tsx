@@ -286,6 +286,78 @@ export default function Admin() {
     },
   });
 
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: "pending" | "confirmed" | "delivered" | "cancelled" }) => {
+      switch (status) {
+        case "confirmed":
+          return apiRequest("POST", `/api/admin/orders/${orderId}/confirm`);
+        case "delivered":
+          return apiRequest("POST", `/api/admin/orders/${orderId}/deliver`);
+        case "cancelled":
+          return apiRequest("POST", `/api/admin/orders/${orderId}/cancel`, { body: { reason: "Cancelled by admin" } });
+        default:
+          throw new Error("Invalid status transition");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Order status updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update order status", 
+        description: error.message || "Please try again",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleOrderStatusChange = (orderId: string, newStatus: "pending" | "confirmed" | "delivered" | "cancelled") => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    // Prevent invalid status transitions
+    if (order.status === "delivered" || order.status === "cancelled") {
+      toast({
+        title: "Cannot change status",
+        description: "Delivered and cancelled orders cannot be modified",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // For cancelled status, could add a confirmation dialog in the future
+    updateOrderStatusMutation.mutate({ orderId, status: newStatus });
+  };
+
+  // Product status helper functions
+  const getProductStatus = (product: any) => {
+    if (!product.isActive) return "inactive"; // Use "inactive" consistently 
+    if (product.isSoldOut) return "sold";
+    return "active";
+  };
+
+  const handleProductStatusChange = (productId: string, newStatus: string) => {
+    switch (newStatus) {
+      case "active":
+        updateProductMutation.mutate({ id: productId, isActive: true, isSoldOut: false });
+        break;
+      case "inactive":
+        updateProductMutation.mutate({ id: productId, isActive: false, isSoldOut: false });
+        break;
+      case "sold":
+        updateProductMutation.mutate({ id: productId, isActive: false, isSoldOut: true }); // Set inactive when sold
+        break;
+      default:
+        toast({
+          title: "Invalid status",
+          description: "Please select a valid product status",
+          variant: "destructive"
+        });
+    }
+  };
+
   // Enhanced bulk operations - moved before early return
   const bulkEmailMutation = useMutation({
     mutationFn: async (emailData: { subject: string; content: string; recipients: string }) => {
@@ -1101,28 +1173,40 @@ export default function Admin() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {order.status === "pending" && (
-                                <Button
-                                  size="sm"
-                                  className="bg-green-600 hover:bg-green-700"
-                                  onClick={() => confirmOrderMutation.mutate(order.id)}
-                                  disabled={confirmOrderMutation.isPending}
-                                  data-testid={`button-confirm-${order.id}`}
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {order.status === "confirmed" && (
-                                <Button
-                                  size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700"
-                                  onClick={() => deliverOrderMutation.mutate(order.id)}
-                                  disabled={deliverOrderMutation.isPending}
-                                  data-testid={`button-deliver-${order.id}`}
-                                >
-                                  <Clock className="h-4 w-4" />
-                                </Button>
-                              )}
+                              
+                              {/* Status Toggle Dropdown */}
+                              <Select 
+                                value={order.status} 
+                                onValueChange={(newStatus) => handleOrderStatusChange(order.id, newStatus as "pending" | "confirmed" | "delivered" | "cancelled")}
+                                disabled={updateOrderStatusMutation.isPending || order.status === "delivered" || order.status === "cancelled"}
+                              >
+                                <SelectTrigger className="w-32" data-testid={`select-status-${order.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {order.status === "pending" && (
+                                    <>
+                                      <SelectItem value="pending">Pending</SelectItem>
+                                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                                      <SelectItem value="cancelled">Cancel</SelectItem>
+                                    </>
+                                  )}
+                                  {order.status === "confirmed" && (
+                                    <>
+                                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                                      <SelectItem value="delivered">Delivered</SelectItem>
+                                      <SelectItem value="cancelled">Cancel</SelectItem>
+                                    </>
+                                  )}
+                                  {order.status === "delivered" && (
+                                    <SelectItem value="delivered">Delivered</SelectItem>
+                                  )}
+                                  {order.status === "cancelled" && (
+                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+
                               {(order.status === "confirmed" || order.status === "delivered" || order.invoiceGenerated) && (
                                 <Button
                                   size="sm"
@@ -1595,31 +1679,21 @@ export default function Admin() {
                                 <Edit className="h-4 w-4" />
                               </Button>
 
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateProductMutation.mutate({ 
-                                  id: product.id, 
-                                  isActive: !product.isActive 
-                                })}
+                              {/* Product Status Dropdown */}
+                              <Select 
+                                value={getProductStatus(product)} 
+                                onValueChange={(newStatus) => handleProductStatusChange(product.id, newStatus)}
                                 disabled={updateProductMutation.isPending}
-                                data-testid={`button-toggle-active-${product.id}`}
                               >
-                                {product.isActive ? "Deactivate" : "Activate"}
-                              </Button>
-                              
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateProductMutation.mutate({ 
-                                  id: product.id, 
-                                  isSoldOut: !product.isSoldOut 
-                                })}
-                                disabled={updateProductMutation.isPending}
-                                data-testid={`button-toggle-sold-${product.id}`}
-                              >
-                                {product.isSoldOut ? "Mark Available" : "Mark Sold"}
-                              </Button>
+                                <SelectTrigger className="w-32" data-testid={`select-product-status-${product.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="active">Active</SelectItem>
+                                  <SelectItem value="inactive">Inactive</SelectItem>
+                                  <SelectItem value="sold">Sold Out</SelectItem>
+                                </SelectContent>
+                              </Select>
                               
                               <Button
                                 size="sm"

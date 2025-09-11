@@ -313,6 +313,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/orders/:id/deliver", requireAdminAuth, async (req, res) => {
+    try {
+      await storage.markOrderDelivered(req.params.id);
+      res.json({ message: "Order marked as delivered successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark order as delivered" });
+    }
+  });
+
   app.get("/api/admin/orders/:id/invoice", requireAdminAuth, async (req, res) => {
     try {
       const orderId = req.params.id;
