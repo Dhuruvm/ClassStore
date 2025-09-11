@@ -10,19 +10,26 @@ export interface IStorage {
   // Product methods
   getProducts(): Promise<Product[]>;
   getAllProducts(): Promise<Product[]>;
+  getApprovedProducts(): Promise<Product[]>;
+  getPendingProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProductLikes(id: string, likes: number): Promise<void>;
   getProductsByClass(classNum: number): Promise<Product[]>;
+  getProductsBySeller(sellerId: string): Promise<Product[]>;
   updateProductStatus(id: string, status: { isActive?: boolean; isSoldOut?: boolean }): Promise<void>;
+  updateProductApproval(id: string, status: "approved" | "rejected", adminId: string, reason?: string): Promise<void>;
   deleteProduct(id: string): Promise<void>;
   updateProductDetails(id: string, updates: Partial<Product>): Promise<void>;
 
   // Order methods
   getOrders(): Promise<(Order & { product: Product })[]>;
+  getOrdersByBuyer(buyerId: string): Promise<(Order & { product: Product })[]>;
   getOrder(id: string): Promise<(Order & { product: Product }) | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
-  updateOrderStatus(id: string, status: "pending" | "confirmed" | "cancelled"): Promise<void>;
+  updateOrderStatus(id: string, status: "pending" | "confirmed" | "delivered" | "cancelled", cancelledBy?: string, reason?: string): Promise<void>;
+  markOrderDelivered(id: string): Promise<void>;
+  cancelOrder(id: string, cancelledBy: string, reason: string): Promise<void>;
 
   // Admin methods
   getAdmin(id: string): Promise<Admin | undefined>;
@@ -59,9 +66,15 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
         sellerName: "Sarah Wilson",
         sellerPhone: "+1234567890",
+        sellerEmail: "sarah.wilson@school.edu",
+        sellerId: "seller_001",
         likes: 15,
         isActive: true,
         isSoldOut: false,
+        approvalStatus: "approved",
+        approvedAt: new Date(),
+        approvedBy: "admin_001",
+        rejectionReason: null,
         category: "Textbooks",
         condition: "Excellent",
         createdAt: new Date(),
@@ -76,9 +89,15 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
         sellerName: "Mike Johnson",
         sellerPhone: "+1234567891",
+        sellerEmail: "mike.johnson@school.edu",
+        sellerId: "seller_002",
         likes: 8,
         isActive: true,
         isSoldOut: false,
+        approvalStatus: "approved",
+        approvedAt: new Date(),
+        approvedBy: "admin_001",
+        rejectionReason: null,
         category: "Stationery",
         condition: "New",
         createdAt: new Date(),
@@ -93,9 +112,15 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
         sellerName: "Emma Davis",
         sellerPhone: "+1234567892",
+        sellerEmail: "emma.davis@school.edu",
+        sellerId: "seller_003",
         likes: 23,
         isActive: true,
         isSoldOut: false,
+        approvalStatus: "approved",
+        approvedAt: new Date(),
+        approvedBy: "admin_001",
+        rejectionReason: null,
         category: "Electronics",
         condition: "Like New",
         createdAt: new Date(),
@@ -110,9 +135,15 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1582719471384-894fbb16e074?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
         sellerName: "Alex Chen",
         sellerPhone: "+1234567893",
+        sellerEmail: "alex.chen@school.edu",
+        sellerId: "seller_004",
         likes: 12,
         isActive: true,
         isSoldOut: false,
+        approvalStatus: "approved",
+        approvedAt: new Date(),
+        approvedBy: "admin_001",
+        rejectionReason: null,
         category: "Lab Equipment",
         condition: "Good",
         createdAt: new Date(),
@@ -128,9 +159,15 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
         sellerName: "John Smith",
         sellerPhone: "+1234567894",
+        sellerEmail: "john.smith@school.edu",
+        sellerId: "seller_005",
         likes: 5,
         isActive: false,
         isSoldOut: true,
+        approvalStatus: "approved",
+        approvedAt: new Date(),
+        approvedBy: "admin_001",
+        rejectionReason: null,
         category: "Textbooks",
         condition: "Good",
         createdAt: new Date(),
@@ -145,9 +182,15 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
         sellerName: "Lisa Brown",
         sellerPhone: "+1234567895",
+        sellerEmail: "lisa.brown@school.edu",
+        sellerId: "seller_006",
         likes: 3,
         isActive: false,
         isSoldOut: false,
+        approvalStatus: "approved",
+        approvedAt: new Date(),
+        approvedBy: "admin_001",
+        rejectionReason: null,
         category: "Art Supplies",
         condition: "Good",
         createdAt: new Date(),
@@ -205,11 +248,17 @@ export class MemStorage implements IStorage {
       id,
       description: insertProduct.description || null,
       imageUrl: insertProduct.imageUrl || null,
+      sellerEmail: insertProduct.sellerEmail || null,
+      sellerId: insertProduct.sellerId || null,
       category: insertProduct.category || "General",
       condition: insertProduct.condition || "Good",
       likes: 0,
       isActive: true,
       isSoldOut: false,
+      approvalStatus: "pending",
+      approvedAt: null,
+      approvedBy: null,
+      rejectionReason: null,
       createdAt: new Date(),
     };
     this.products.set(id, product);
@@ -224,8 +273,20 @@ export class MemStorage implements IStorage {
     }
   }
 
+  async getApprovedProducts(): Promise<Product[]> {
+    return Array.from(this.products.values()).filter(p => p.approvalStatus === "approved");
+  }
+
+  async getPendingProducts(): Promise<Product[]> {
+    return Array.from(this.products.values()).filter(p => p.approvalStatus === "pending");
+  }
+
   async getProductsByClass(classNum: number): Promise<Product[]> {
     return Array.from(this.products.values()).filter(p => p.class === classNum && p.isActive);
+  }
+
+  async getProductsBySeller(sellerId: string): Promise<Product[]> {
+    return Array.from(this.products.values()).filter(p => p.sellerId === sellerId);
   }
 
   async updateProductStatus(id: string, status: { isActive?: boolean; isSoldOut?: boolean }): Promise<void> {
@@ -236,6 +297,22 @@ export class MemStorage implements IStorage {
       }
       if (status.isSoldOut !== undefined) {
         product.isSoldOut = status.isSoldOut;
+      }
+      this.products.set(id, product);
+    }
+  }
+
+  async updateProductApproval(id: string, status: "approved" | "rejected", adminId: string, reason?: string): Promise<void> {
+    const product = this.products.get(id);
+    if (product) {
+      product.approvalStatus = status;
+      product.approvedBy = adminId;
+      if (status === "approved") {
+        product.approvedAt = new Date();
+        product.rejectionReason = null;
+      } else {
+        product.approvedAt = null;
+        product.rejectionReason = reason || null;
       }
       this.products.set(id, product);
     }
@@ -276,9 +353,14 @@ export class MemStorage implements IStorage {
     const order: Order = {
       ...insertOrder,
       amount: typeof insertOrder.amount === 'number' ? insertOrder.amount.toString() : insertOrder.amount,
-      deliveryInstructions: insertOrder.deliveryInstructions || null,
+      buyerId: insertOrder.buyerId || null,
+      additionalNotes: insertOrder.additionalNotes || null,
       id,
       status: "pending",
+      cancelledBy: null,
+      cancellationReason: null,
+      deliveryConfirmedAt: null,
+      invoiceGenerated: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -286,10 +368,44 @@ export class MemStorage implements IStorage {
     return order;
   }
 
-  async updateOrderStatus(id: string, status: "pending" | "confirmed" | "cancelled"): Promise<void> {
+  async getOrdersByBuyer(buyerId: string): Promise<(Order & { product: Product })[]> {
+    return Array.from(this.orders.values())
+      .filter(order => order.buyerId === buyerId)
+      .map(order => {
+        const product = this.products.get(order.productId)!;
+        return { ...order, product };
+      });
+  }
+
+  async updateOrderStatus(id: string, status: "pending" | "confirmed" | "delivered" | "cancelled", cancelledBy?: string, reason?: string): Promise<void> {
     const order = this.orders.get(id);
     if (order) {
       order.status = status;
+      order.updatedAt = new Date();
+      if (status === "cancelled" && cancelledBy && reason) {
+        order.cancelledBy = cancelledBy;
+        order.cancellationReason = reason;
+      }
+      this.orders.set(id, order);
+    }
+  }
+
+  async markOrderDelivered(id: string): Promise<void> {
+    const order = this.orders.get(id);
+    if (order) {
+      order.status = "delivered";
+      order.deliveryConfirmedAt = new Date();
+      order.updatedAt = new Date();
+      this.orders.set(id, order);
+    }
+  }
+
+  async cancelOrder(id: string, cancelledBy: string, reason: string): Promise<void> {
+    const order = this.orders.get(id);
+    if (order) {
+      order.status = "cancelled";
+      order.cancelledBy = cancelledBy;
+      order.cancellationReason = reason;
       order.updatedAt = new Date();
       this.orders.set(id, order);
     }
