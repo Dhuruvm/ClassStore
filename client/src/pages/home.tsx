@@ -15,18 +15,12 @@ export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [classFilter, setClassFilter] = useState<string>("");
-  const [sortBy, setSortBy] = useState<string>("popular");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ["/api/products", classFilter, sortBy],
+    queryKey: ["/api/products"],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (classFilter) params.append("class", classFilter);
-      if (sortBy) params.append("sort", sortBy);
-      
-      const response = await fetch(`/api/products?${params}`);
+      const response = await fetch(`/api/products`);
       if (!response.ok) throw new Error("Failed to fetch products");
       return response.json();
     },
@@ -98,67 +92,14 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Filters Section - Nike minimal style */}
+      {/* Simple Header Section */}
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="flex flex-wrap gap-6 items-center">
-              <div className="flex items-center space-x-3">
-                <label className="text-sm font-bold text-black uppercase tracking-wide">Grade:</label>
-                <Select value={classFilter || "all"} onValueChange={(value) => setClassFilter(value === "all" ? "" : value)}>
-                  <SelectTrigger className="w-32 h-10 bg-gray-50 border-0 rounded-none font-medium" data-testid="select-class-filter">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="6">Grade 6</SelectItem>
-                    <SelectItem value="7">Grade 7</SelectItem>
-                    <SelectItem value="8">Grade 8</SelectItem>
-                    <SelectItem value="9">Grade 9</SelectItem>
-                    <SelectItem value="10">Grade 10</SelectItem>
-                    <SelectItem value="11">Grade 11</SelectItem>
-                    <SelectItem value="12">Grade 12</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <label className="text-sm font-bold text-black uppercase tracking-wide">Sort:</label>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-40 h-10 bg-gray-50 border-0 rounded-none font-medium" data-testid="select-sort">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="popular">Popular</SelectItem>
-                    <SelectItem value="newest">Newest</SelectItem>
-                    <SelectItem value="price-low">Price: Low</SelectItem>
-                    <SelectItem value="price-high">Price: High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-6">
-              <span className="text-sm font-medium text-gray-600" data-testid="text-items-count">
-                {products.length} Items
-              </span>
-              <div className="flex border border-gray-200 rounded-none overflow-hidden">
-                <button 
-                  className={`px-3 py-2 transition-colors ${viewMode === "grid" ? "bg-black text-white" : "text-black hover:bg-gray-50"}`}
-                  onClick={() => setViewMode("grid")}
-                  data-testid="button-grid-view"
-                >
-                  <Grid className="h-4 w-4" />
-                </button>
-                <button 
-                  className={`px-3 py-2 transition-colors ${viewMode === "list" ? "bg-black text-white" : "text-black hover:bg-gray-50"}`}
-                  onClick={() => setViewMode("list")}
-                  data-testid="button-list-view"
-                >
-                  <List className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-black">All Items</h2>
+            <span className="text-sm font-medium text-gray-600" data-testid="text-items-count">
+              {products.length} Items Available
+            </span>
           </div>
         </div>
       </div>
@@ -168,24 +109,24 @@ export default function Home() {
         {products.length === 0 ? (
           <div className="text-center py-24" data-testid="text-no-products">
             <h3 className="text-2xl font-bold text-black mb-4">Nothing Here</h3>
-            <p className="text-gray-600 mb-8">Check back soon for new items.</p>
-            <Button className="nike-btn">
-              Browse All Grades
+            <p className="text-gray-600 mb-8">Check back soon for new items or list your own!</p>
+            <Button 
+              className="nike-btn"
+              onClick={() => setLocation("/sell")}
+              data-testid="button-start-selling"
+            >
+              Start Selling
             </Button>
           </div>
         ) : (
-          <div>
-            {/* Nike-Style Uniform Product Grid */}
-            <h2 className="text-2xl font-bold text-black mb-8">All Items</h2>
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
-              {products.map((product: Product) => (
-                <ProductCard 
-                  key={product.id}
-                  product={product}
-                  onPurchase={handlePurchase}
-                />
-              ))}
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
+            {products.map((product: Product) => (
+              <ProductCard 
+                key={product.id}
+                product={product}
+                onPurchase={handlePurchase}
+              />
+            ))}
           </div>
         )}
       </div>
