@@ -4,7 +4,7 @@ import {
   LogOut, ShoppingCart, Clock, DollarSign, Package, Download, Users, 
   TrendingUp, BarChart3, Settings, Mail, Database, Activity, 
   Trash2, Edit, Plus, Filter, Search, RefreshCw, Send,
-  Eye, CheckCircle, XCircle, AlertTriangle, Target, Zap
+  Eye, CheckCircle, XCircle, AlertTriangle, Target, Zap, Upload
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
