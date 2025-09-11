@@ -836,6 +836,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test email endpoint
+  app.post("/api/test-email", async (req, res) => {
+    try {
+      console.log("🧪 Testing email functionality...");
+      
+      // Create a test email directly without connection verification
+      const testEmailData = {
+        to: "dhuruvm4@gmail.com",
+        toName: "Test User",
+        subject: "Test Email from ClassStore",
+        htmlContent: `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">🚀 Test Email Success!</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">ClassStore Email Notifications are Working</p>
+            </div>
+            
+            <!-- Content -->
+            <div style="padding: 40px 30px;">
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+                Great news! Your Omnisend email integration is now working correctly. This test confirms that your ClassStore application can successfully send transactional emails.
+              </p>
+              
+              <!-- Test Details -->
+              <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 30px; margin: 30px 0;">
+                <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 22px; font-weight: 600;">Test Details:</h3>
+                <div style="display: grid; gap: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: #6b7280; font-weight: 500;">Service:</span>
+                    <span style="color: #374151; font-weight: 600;">Omnisend API</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                    <span style="color: #6b7280; font-weight: 500;">Test Time:</span>
+                    <span style="color: #374151; font-weight: 600;">${new Date().toLocaleString()}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                    <span style="color: #6b7280; font-weight: 500;">Application:</span>
+                    <span style="color: #374151; font-weight: 600;">ClassStore Student Marketplace</span>
+                  </div>
+                </div>
+              </div>
+              
+              <p style="color: #059669; font-weight: 600; text-align: center; margin-top: 30px;">
+                ✅ Email notifications are now fully operational!
+              </p>
+            </div>
+          </div>
+        `,
+        from: "noreply@classstore.com",
+        fromName: "ClassStore Test"
+      };
+
+      // Use the sendTransactionalEmail method directly
+      const result = await (emailService as any).sendTransactionalEmail(testEmailData);
+      console.log("✓ Test email sent successfully to dhuruvm4@gmail.com");
+      
+      res.json({ 
+        message: "Test email sent successfully!",
+        recipient: "dhuruvm4@gmail.com",
+        timestamp: new Date().toISOString(),
+        result 
+      });
+    } catch (error: any) {
+      console.error("✗ Test email failed:", error);
+      res.status(500).json({ 
+        message: "Test email failed", 
+        error: error.message,
+        details: error.response?.data || "No additional details"
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
