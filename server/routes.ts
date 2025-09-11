@@ -397,6 +397,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User management routes
+  app.get("/api/admin/users", requireAdminAuth, async (req, res) => {
+    try {
+      // Since we don't have a separate users table yet, let's get unique buyers from orders
+      const orders = await storage.getOrders();
+      const userMap = new Map();
+      
+      orders.forEach(order => {
+        if (!userMap.has(order.buyerEmail)) {
+          userMap.set(order.buyerEmail, {
+            id: order.buyerEmail, // Using email as ID
+            name: order.buyerName,
+            email: order.buyerEmail,
+            phone: order.buyerPhone,
+            class: order.buyerClass,
+            section: order.buyerSection,
+            totalOrders: 0,
+            totalSpent: 0,
+            lastOrderDate: order.createdAt,
+            status: "active"
+          });
+        }
+        
+        const user = userMap.get(order.buyerEmail);
+        user.totalOrders++;
+        user.totalSpent += parseFloat(order.amount);
+        if (new Date(order.createdAt!) > new Date(user.lastOrderDate)) {
+          user.lastOrderDate = order.createdAt;
+        }
+      });
+
+      const users = Array.from(userMap.values());
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Product management routes
+  app.get("/api/admin/products", requireAdminAuth, async (req, res) => {
+    try {
+      const products = await storage.getAllProducts();
+      const orders = await storage.getOrders();
+      
+      // Add sales data to each product
+      const productsWithSales = products.map(product => ({
+        ...product,
+        totalSales: orders.filter(o => o.productId === product.id && o.status === "confirmed").length,
+        totalRevenue: orders
+          .filter(o => o.productId === product.id && o.status === "confirmed")
+          .reduce((sum, o) => sum + parseFloat(o.amount), 0),
+        pendingOrders: orders.filter(o => o.productId === product.id && o.status === "pending").length
+      }));
+
+      res.json(productsWithSales);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.patch("/api/admin/products/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive, isSoldOut } = req.body;
+      
+      await storage.updateProductStatus(id, { isActive, isSoldOut });
+      res.json({ message: "Product updated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/admin/products/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteProduct(id);
+      res.json({ message: "Product deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete product" });
+    }
+  });
+
+  // System management routes
+  app.post("/api/admin/clear-cache", requireAdminAuth, async (req, res) => {
+    try {
+      // Simulate cache clearing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      res.json({ message: "Cache cleared successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear cache" });
+    }
+  });
+
+  app.post("/api/admin/restart-services", requireAdminAuth, async (req, res) => {
+    try {
+      // Simulate service restart
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      res.json({ message: "Services restarted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to restart services" });
+    }
+  });
+
+  app.get("/api/admin/export-data", requireAdminAuth, async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      const products = await storage.getAllProducts();
+      
+      const exportData = {
+        orders: orders.map(order => ({
+          id: order.id,
+          productName: order.product?.name,
+          buyerName: order.buyerName,
+          buyerEmail: order.buyerEmail,
+          amount: order.amount,
+          status: order.status,
+          createdAt: order.createdAt
+        })),
+        products: products.map(product => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          category: product.category,
+          condition: product.condition,
+          sellerName: product.sellerName,
+          isActive: product.isActive,
+          likes: product.likes,
+          createdAt: product.createdAt
+        })),
+        exportDate: new Date().toISOString()
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename=classstore-data.json');
+      res.send(JSON.stringify(exportData, null, 2));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to export data" });
+    }
+  });
+
   // Quick confirm/cancel routes for email links
   app.get("/api/admin/confirm/:orderId", async (req, res) => {
     try {

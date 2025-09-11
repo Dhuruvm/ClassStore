@@ -145,6 +145,16 @@ export default function Admin() {
     enabled: authState === "authenticated",
   });
 
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/users"],
+    enabled: authState === "authenticated",
+  });
+
+  const { data: adminProducts = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/products"],
+    enabled: authState === "authenticated",
+  });
+
   // Order actions
   const confirmOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -190,6 +200,67 @@ export default function Admin() {
     onSuccess: () => {
       toast({ title: "System optimized successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/system-metrics"] });
+    },
+  });
+
+  // Product management mutations
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, isActive, isSoldOut }: { id: string; isActive?: boolean; isSoldOut?: boolean }) => {
+      return apiRequest("PATCH", `/api/admin/products/${id}`, { isActive, isSoldOut });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Product updated successfully" });
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/admin/products/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Product deleted successfully" });
+    },
+  });
+
+  // System action mutations
+  const clearCacheMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/clear-cache");
+    },
+    onSuccess: () => {
+      toast({ title: "Cache cleared successfully" });
+    },
+  });
+
+  const restartServicesMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/restart-services");
+    },
+    onSuccess: () => {
+      toast({ title: "Services restarted successfully" });
+    },
+  });
+
+  const exportDataMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/export-data", { credentials: "include" });
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'classstore-data.json';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    },
+    onSuccess: () => {
+      toast({ title: "Data exported successfully" });
     },
   });
 
@@ -642,17 +713,35 @@ export default function Admin() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => clearCacheMutation.mutate()}
+                    disabled={clearCacheMutation.isPending}
+                    data-testid="button-clear-cache"
+                  >
                     <Database className="h-4 w-4 mr-2" />
-                    Clear Cache
+                    {clearCacheMutation.isPending ? "Clearing..." : "Clear Cache"}
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => restartServicesMutation.mutate()}
+                    disabled={restartServicesMutation.isPending}
+                    data-testid="button-restart-services"
+                  >
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Restart Services
+                    {restartServicesMutation.isPending ? "Restarting..." : "Restart Services"}
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => exportDataMutation.mutate()}
+                    disabled={exportDataMutation.isPending}
+                    data-testid="button-export-data"
+                  >
                     <Download className="h-4 w-4 mr-2" />
-                    Export Data
+                    {exportDataMutation.isPending ? "Exporting..." : "Export Data"}
                   </Button>
                 </CardContent>
               </Card>
@@ -661,23 +750,106 @@ export default function Admin() {
 
           {/* Users Tab */}
           <TabsContent value="users" className="space-y-6">
-            <Card>
+            <Card data-testid="table-users">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span className="flex items-center space-x-2">
                     <Users className="h-5 w-5" />
                     <span>User Management</span>
                   </span>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add User
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                      <Input placeholder="Search users..." className="pl-10 w-64" />
+                    </div>
+                    <Button variant="outline" size="sm">
+                      <Filter className="h-4 w-4 mr-2" />
+                      Filter
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>User management coming soon...</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-4 font-medium">User</th>
+                        <th className="text-left p-4 font-medium">Contact</th>
+                        <th className="text-left p-4 font-medium">Class/Section</th>
+                        <th className="text-left p-4 font-medium">Orders</th>
+                        <th className="text-left p-4 font-medium">Total Spent</th>
+                        <th className="text-left p-4 font-medium">Last Order</th>
+                        <th className="text-left p-4 font-medium">Status</th>
+                        <th className="text-left p-4 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={user.id} className="border-b border-border hover:bg-muted/50" data-testid={`row-user-${user.id}`}>
+                          <td className="p-4" data-testid={`text-user-name-${user.id}`}>
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-sm text-muted-foreground">{user.email}</div>
+                            </div>
+                          </td>
+                          <td className="p-4" data-testid={`text-user-phone-${user.id}`}>
+                            {user.phone}
+                          </td>
+                          <td className="p-4" data-testid={`text-user-class-${user.id}`}>
+                            Class {user.class}, Section {user.section}
+                          </td>
+                          <td className="p-4 font-semibold" data-testid={`text-user-orders-${user.id}`}>
+                            {user.totalOrders}
+                          </td>
+                          <td className="p-4 font-semibold text-green-600" data-testid={`text-user-spent-${user.id}`}>
+                            ₹{user.totalSpent.toFixed(2)}
+                          </td>
+                          <td className="p-4 text-sm text-muted-foreground" data-testid={`text-user-last-order-${user.id}`}>
+                            {user.lastOrderDate ? new Date(user.lastOrderDate).toLocaleDateString() : 'Never'}
+                          </td>
+                          <td className="p-4">
+                            <Badge 
+                              className={user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} 
+                              data-testid={`badge-user-status-${user.id}`}
+                            >
+                              {user.status}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                data-testid={`button-view-user-${user.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                data-testid={`button-edit-user-${user.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  {users.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground" data-testid="text-no-users">
+                      <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No users found</p>
+                      <p className="text-sm mt-2">Users will appear here when they place orders</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -685,23 +857,164 @@ export default function Admin() {
 
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-6">
-            <Card>
+            <Card data-testid="table-products">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span className="flex items-center space-x-2">
                     <Package className="h-5 w-5" />
                     <span>Product Management</span>
                   </span>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Product
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                      <Input placeholder="Search products..." className="pl-10 w-64" />
+                    </div>
+                    <Select defaultValue="all">
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="sold">Sold Out</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Product management coming soon...</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-4 font-medium">Product</th>
+                        <th className="text-left p-4 font-medium">Seller</th>
+                        <th className="text-left p-4 font-medium">Price</th>
+                        <th className="text-left p-4 font-medium">Category</th>
+                        <th className="text-left p-4 font-medium">Sales</th>
+                        <th className="text-left p-4 font-medium">Revenue</th>
+                        <th className="text-left p-4 font-medium">Status</th>
+                        <th className="text-left p-4 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminProducts.map((product) => (
+                        <tr key={product.id} className="border-b border-border hover:bg-muted/50" data-testid={`row-product-${product.id}`}>
+                          <td className="p-4" data-testid={`text-product-name-${product.id}`}>
+                            <div className="flex items-center space-x-3">
+                              {product.imageUrl && (
+                                <img 
+                                  src={product.imageUrl} 
+                                  alt={product.name}
+                                  className="w-12 h-12 object-cover rounded-lg"
+                                />
+                              )}
+                              <div>
+                                <div className="font-medium">{product.name}</div>
+                                <div className="text-sm text-muted-foreground">Class {product.class}, Section {product.section}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4" data-testid={`text-product-seller-${product.id}`}>
+                            <div>
+                              <div className="font-medium">{product.sellerName}</div>
+                              <div className="text-sm text-muted-foreground">{product.sellerPhone}</div>
+                            </div>
+                          </td>
+                          <td className="p-4 font-semibold" data-testid={`text-product-price-${product.id}`}>
+                            ₹{product.price}
+                          </td>
+                          <td className="p-4" data-testid={`text-product-category-${product.id}`}>
+                            <Badge variant="outline">{product.category}</Badge>
+                          </td>
+                          <td className="p-4 font-semibold text-blue-600" data-testid={`text-product-sales-${product.id}`}>
+                            {product.totalSales || 0}
+                          </td>
+                          <td className="p-4 font-semibold text-green-600" data-testid={`text-product-revenue-${product.id}`}>
+                            ₹{(product.totalRevenue || 0).toFixed(2)}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col space-y-1">
+                              {product.isSoldOut ? (
+                                <Badge className="bg-red-100 text-red-800" data-testid={`badge-sold-out-${product.id}`}>
+                                  Sold Out
+                                </Badge>
+                              ) : product.isActive ? (
+                                <Badge className="bg-green-100 text-green-800" data-testid={`badge-active-${product.id}`}>
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-gray-100 text-gray-800" data-testid={`badge-inactive-${product.id}`}>
+                                  Inactive
+                                </Badge>
+                              )}
+                              {product.pendingOrders > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  {product.pendingOrders} pending
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateProductMutation.mutate({ 
+                                  id: product.id, 
+                                  isActive: !product.isActive 
+                                })}
+                                disabled={updateProductMutation.isPending}
+                                data-testid={`button-toggle-active-${product.id}`}
+                              >
+                                {product.isActive ? "Deactivate" : "Activate"}
+                              </Button>
+                              
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateProductMutation.mutate({ 
+                                  id: product.id, 
+                                  isSoldOut: !product.isSoldOut 
+                                })}
+                                disabled={updateProductMutation.isPending}
+                                data-testid={`button-toggle-sold-${product.id}`}
+                              >
+                                {product.isSoldOut ? "Mark Available" : "Mark Sold"}
+                              </Button>
+                              
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  if (confirm("Are you sure you want to delete this product?")) {
+                                    deleteProductMutation.mutate(product.id);
+                                  }
+                                }}
+                                disabled={deleteProductMutation.isPending}
+                                data-testid={`button-delete-${product.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  {adminProducts.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground" data-testid="text-no-products">
+                      <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No products found</p>
+                      <p className="text-sm mt-2">Products will appear here when sellers list them</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

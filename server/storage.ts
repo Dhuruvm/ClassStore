@@ -9,10 +9,13 @@ export interface IStorage {
 
   // Product methods
   getProducts(): Promise<Product[]>;
+  getAllProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProductLikes(id: string, likes: number): Promise<void>;
   getProductsByClass(classNum: number): Promise<Product[]>;
+  updateProductStatus(id: string, status: { isActive?: boolean; isSoldOut?: boolean }): Promise<void>;
+  deleteProduct(id: string): Promise<void>;
 
   // Order methods
   getOrders(): Promise<(Order & { product: Product })[]>;
@@ -113,6 +116,41 @@ export class MemStorage implements IStorage {
         condition: "Good",
         createdAt: new Date(),
       },
+      // Add some inactive products to test admin panel
+      {
+        id: randomUUID(),
+        name: "Old Physics Textbook (SOLD)",
+        description: "Physics textbook - already sold to another student",
+        price: "35.00",
+        class: 11,
+        section: "B",
+        imageUrl: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
+        sellerName: "John Smith",
+        sellerPhone: "+1234567894",
+        likes: 5,
+        isActive: false,
+        isSoldOut: true,
+        category: "Textbooks",
+        condition: "Good",
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Deactivated Art Supplies",
+        description: "Art supplies set - temporarily deactivated by admin",
+        price: "15.00",
+        class: 9,
+        section: "A",
+        imageUrl: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
+        sellerName: "Lisa Brown",
+        sellerPhone: "+1234567895",
+        likes: 3,
+        isActive: false,
+        isSoldOut: false,
+        category: "Art Supplies",
+        condition: "Good",
+        createdAt: new Date(),
+      },
     ];
 
     sampleProducts.forEach(product => {
@@ -151,6 +189,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.products.values()).filter(p => p.isActive);
   }
 
+  async getAllProducts(): Promise<Product[]> {
+    return Array.from(this.products.values());
+  }
+
   async getProduct(id: string): Promise<Product | undefined> {
     return this.products.get(id);
   }
@@ -183,6 +225,23 @@ export class MemStorage implements IStorage {
 
   async getProductsByClass(classNum: number): Promise<Product[]> {
     return Array.from(this.products.values()).filter(p => p.class === classNum && p.isActive);
+  }
+
+  async updateProductStatus(id: string, status: { isActive?: boolean; isSoldOut?: boolean }): Promise<void> {
+    const product = this.products.get(id);
+    if (product) {
+      if (status.isActive !== undefined) {
+        product.isActive = status.isActive;
+      }
+      if (status.isSoldOut !== undefined) {
+        product.isSoldOut = status.isSoldOut;
+      }
+      this.products.set(id, product);
+    }
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    this.products.delete(id);
   }
 
   // Order methods
