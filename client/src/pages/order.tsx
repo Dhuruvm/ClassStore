@@ -77,27 +77,113 @@ export default function OrderPage() {
 
     if (!product) return;
 
+    // Validate required fields
+    if (!formData.buyerName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter your full name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.buyerClass) {
+      toast({
+        title: "Validation Error", 
+        description: "Please select your class",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.buyerSection.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter your section",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.buyerEmail.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter your email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.buyerPhone.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter your phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.pickupLocation) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a pickup location",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.pickupTime) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a preferred pickup time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.buyerEmail)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate phone number (basic validation for 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.buyerPhone.replace(/\D/g, ''))) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid 10-digit phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Generate customer ID and sync customer data
     const customerId = CustomerService.getCustomerId();
     CustomerService.syncCustomerFromOrder({
-      buyerName: formData.buyerName,
-      buyerEmail: formData.buyerEmail,
-      buyerPhone: formData.buyerPhone,
+      buyerName: formData.buyerName.trim(),
+      buyerEmail: formData.buyerEmail.trim(),
+      buyerPhone: formData.buyerPhone.trim(),
       buyerClass: parseInt(formData.buyerClass),
-      buyerSection: formData.buyerSection,
+      buyerSection: formData.buyerSection.trim(),
     });
 
     const orderData = {
       productId: product.id,
-      buyerName: formData.buyerName,
+      buyerName: formData.buyerName.trim(),
       buyerClass: formData.buyerClass,
-      buyerSection: formData.buyerSection,
-      buyerEmail: formData.buyerEmail,
-      buyerPhone: formData.buyerPhone,
+      buyerSection: formData.buyerSection.trim(),
+      buyerEmail: formData.buyerEmail.trim(),
+      buyerPhone: formData.buyerPhone.trim(),
       buyerId: `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       pickupLocation: formData.pickupLocation,
       pickupTime: formData.pickupTime,
-      additionalNotes: formData.additionalNotes || "",
+      additionalNotes: formData.additionalNotes.trim() || "",
       amount: product.price.toString(),
       recaptchaToken: "dummy-token",
     };
