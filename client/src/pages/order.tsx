@@ -38,9 +38,11 @@ export default function OrderPage() {
     enabled: !!productId,
   });
 
+  // Submit order
   const orderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      return apiRequest("POST", "/api/orders", orderData);
+      const response = await apiRequest("POST", "/api/orders", { body: orderData });
+      return response;
     },
     onSuccess: (response: any) => {
       // Store order in localStorage for customer tracking
@@ -54,7 +56,7 @@ export default function OrderPage() {
           pickupTime: formData.pickupTime,
         });
       }
-      
+
       toast({
         title: "Order placed successfully!",
         description: "You'll receive an email confirmation shortly. You can track your order in the My Orders section.",
@@ -72,7 +74,7 @@ export default function OrderPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!product) return;
 
     // Generate customer ID and sync customer data
@@ -87,9 +89,15 @@ export default function OrderPage() {
 
     const orderData = {
       productId: product.id,
-      ...formData,
-      buyerId: customerId,
-      buyerClass: parseInt(formData.buyerClass),
+      buyerName: formData.buyerName,
+      buyerClass: formData.buyerClass,
+      buyerSection: formData.buyerSection,
+      buyerEmail: formData.buyerEmail,
+      buyerPhone: formData.buyerPhone,
+      buyerId: `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      pickupLocation: formData.pickupLocation,
+      pickupTime: formData.pickupTime,
+      additionalNotes: formData.additionalNotes || "",
       amount: product.price.toString(),
       recaptchaToken: "dummy-token",
     };
@@ -137,7 +145,7 @@ export default function OrderPage() {
   return (
     <div className="min-h-screen bg-white">
       <Navigation />
-      
+
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="mb-6">
           <Button 
@@ -148,12 +156,12 @@ export default function OrderPage() {
           >
             ← Back to Products
           </Button>
-          
+
           <h1 className="text-3xl font-bold text-gray-800 mb-2" data-testid="text-page-title">
             Complete Your Order
           </h1>
           <p className="text-gray-600">Fill in your details for face-to-face pickup and cash payment</p>
-          
+
           {/* Payment & Delivery Info Banner */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
             <div className="flex items-start space-x-3">
@@ -212,7 +220,7 @@ export default function OrderPage() {
                   data-testid="input-buyer-name"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="buyerClass" className="font-semibold text-gray-700">Class *</Label>
                 <Select 
@@ -268,7 +276,7 @@ export default function OrderPage() {
                   data-testid="input-buyer-email"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="buyerPhone" className="font-semibold text-gray-700">Phone Number *</Label>
                 <Input 
@@ -308,7 +316,7 @@ export default function OrderPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="pickupTime" className="font-semibold text-gray-700">Preferred Pickup Time *</Label>
                 <Select 
