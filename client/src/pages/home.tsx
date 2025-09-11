@@ -174,76 +174,18 @@ export default function Home() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-12">
-            {/* New Arrivals Section Header */}
-            <div>
-              <h2 className="text-2xl font-bold text-black mb-8">New Items</h2>
-              
-              {/* Nike-Style Double Grid Layout */}
-              {products.length >= 2 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-                  {/* Large Featured Product Card */}
-                  <div className="lg:col-span-1">
-                    <div className="relative bg-gray-50 rounded-lg overflow-hidden h-96">
-                      <img 
-                        src={products[0]?.imageUrl || "https://images.unsplash.com/photo-1509228468518-180dd4864904?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600"} 
-                        alt={products[0]?.name}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8">
-                        <h3 className="text-white text-3xl font-bold mb-2">{products[0]?.name}</h3>
-                        <Button 
-                          onClick={() => handlePurchase(products[0])}
-                          className="bg-white text-black hover:bg-gray-200 font-semibold px-8 py-3 rounded-full"
-                        >
-                          Shop Now
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Medium Product Card */}
-                  <div className="lg:col-span-1">
-                    <ProductCard 
-                      product={products[1]}
-                      onPurchase={handlePurchase}
-                    />
-                  </div>
-                </div>
-              )}
-              
-              {/* Bottom 2x2 Grid */}
-              {products.length > 2 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-black mb-6">Just In</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-8">
-                    {products.slice(2, 4).map((product: Product) => (
-                      <ProductCard 
-                        key={product.id}
-                        product={product}
-                        onPurchase={handlePurchase}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+          <div>
+            {/* Nike-Style Uniform Product Grid */}
+            <h2 className="text-2xl font-bold text-black mb-8">All Items</h2>
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
+              {products.map((product: Product) => (
+                <ProductCard 
+                  key={product.id}
+                  product={product}
+                  onPurchase={handlePurchase}
+                />
+              ))}
             </div>
-            
-            {/* All Products Grid */}
-            {products.length > 4 && (
-              <div>
-                <h2 className="text-2xl font-bold text-black mb-8">All Items</h2>
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
-                  {products.slice(4).map((product: Product) => (
-                    <ProductCard 
-                      key={product.id}
-                      product={product}
-                      onPurchase={handlePurchase}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
