@@ -161,6 +161,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer order tracking routes
+  app.get("/api/customers/:buyerId/orders", async (req, res) => {
+    try {
+      const { buyerId } = req.params;
+      const orders = await storage.getOrdersByBuyer(buyerId);
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch customer orders" });
+    }
+  });
+
+  app.post("/api/customers/orders/:id/cancel", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      
+      if (!reason || reason.trim().length < 5) {
+        return res.status(400).json({ message: "Cancellation reason is required (minimum 5 characters)" });
+      }
+
+      // Check if order exists and can be cancelled
+      const order = await storage.getOrder(id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.status === "delivered" || order.status === "cancelled") {
+        return res.status(400).json({ message: "This order cannot be cancelled" });
+      }
+
+      // Cancel the order
+      await storage.cancelOrder(id, "buyer", reason.trim());
+
+      // Send cancellation email notifications
+      try {
+        await emailService.sendCancellationConfirmation(order, order.product, reason.trim());
+        await emailService.sendCancellationNotification(order, order.product, reason.trim());
+      } catch (emailError: any) {
+        console.error("Email sending failed for cancellation:", emailError.message);
+      }
+
+      res.json({ message: "Order cancelled successfully" });
+    } catch (error) {
+      console.error("Order cancellation error:", error);
+      res.status(500).json({ message: "Failed to cancel order" });
+    }
+  });
+
   // Seller routes
   app.post("/api/sellers", upload.single("image"), async (req: Request & { file?: Express.Multer.File }, res) => {
     try {
@@ -177,6 +225,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Seller registration error:", error);
       res.status(400).json({ message: "Invalid product data" });
+    }
+  });
+
+  // Get seller's products
+  app.get("/api/sellers/:sellerId/products", async (req, res) => {
+    try {
+      const { sellerId } = req.params;
+      
+      if (!sellerId) {
+        return res.status(400).json({ message: "Seller ID is required" });
+      }
+
+      const products = await storage.getProductsBySeller(sellerId);
+      
+      // Return all products (approved and pending) for the seller dashboard
+      res.json(products);
+    } catch (error) {
+      console.error("Failed to fetch seller products:", error);
+      res.status(500).json({ message: "Failed to fetch seller products" });
     }
   });
 
@@ -248,15 +315,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/orders/:id/invoice", requireAdminAuth, async (req, res) => {
     try {
-      const invoicePath = path.join(process.cwd(), "server", "invoices", `${req.params.id}.pdf`);
-
-      if (fs.existsSync(invoicePath)) {
-        res.download(invoicePath);
-      } else {
-        res.status(404).json({ message: "Invoice not found" });
+      const orderId = req.params.id;
+      
+      // Get order with product details
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
       }
+
+      const invoicePath = path.join(process.cwd(), "server", "invoices", `${orderId}.pdf`);
+      
+      // Check if invoice already exists
+      if (!fs.existsSync(invoicePath)) {
+        console.log(`📄 Generating invoice for order ${orderId}...`);
+        
+        // Generate the PDF invoice
+        await PDFService.generateInvoicePDF(orderId, order.product, order);
+        
+        // Mark invoice as generated in database
+        await storage.markInvoiceGenerated(orderId);
+        
+        console.log(`✓ Invoice generated successfully for order ${orderId}`);
+      }
+
+      // Set proper headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="ClassStore-Invoice-${orderId.slice(-8).toUpperCase()}.pdf"`);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      // Send the PDF file
+      res.download(invoicePath, `ClassStore-Invoice-${orderId.slice(-8).toUpperCase()}.pdf`, (err) => {
+        if (err) {
+          console.error("Error downloading invoice:", err);
+          if (!res.headersSent) {
+            res.status(500).json({ message: "Failed to download invoice" });
+          }
+        }
+      });
+      
     } catch (error) {
-      res.status(500).json({ message: "Failed to download invoice" });
+      console.error("Invoice generation/download error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to generate or download invoice" });
+      }
+    }
+  });
+
+  // Bulk invoice generation endpoint
+  app.post("/api/admin/invoices/generate-bulk", requireAdminAuth, async (req, res) => {
+    try {
+      const { orderIds } = req.body;
+      
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        return res.status(400).json({ message: "Order IDs array is required" });
+      }
+
+      const results = {
+        generated: 0,
+        failed: 0,
+        alreadyExists: 0,
+        errors: [] as string[]
+      };
+
+      for (const orderId of orderIds) {
+        try {
+          const order = await storage.getOrder(orderId);
+          if (!order) {
+            results.failed++;
+            results.errors.push(`Order ${orderId} not found`);
+            continue;
+          }
+
+          const invoicePath = path.join(process.cwd(), "server", "invoices", `${orderId}.pdf`);
+          
+          if (fs.existsSync(invoicePath)) {
+            results.alreadyExists++;
+            continue;
+          }
+
+          await PDFService.generateInvoicePDF(orderId, order.product, order);
+          await storage.markInvoiceGenerated(orderId);
+          results.generated++;
+          
+        } catch (error) {
+          results.failed++;
+          results.errors.push(`Failed to generate invoice for order ${orderId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      res.json({
+        message: `Bulk invoice generation completed`,
+        results
+      });
+
+    } catch (error) {
+      console.error("Bulk invoice generation error:", error);
+      res.status(500).json({ message: "Failed to process bulk invoice generation" });
     }
   });
 

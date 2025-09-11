@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { CustomerService } from "@/lib/customer";
 import { Product } from "@shared/schema";
 import Navigation from "@/components/navigation";
 
@@ -41,10 +42,22 @@ export default function OrderPage() {
     mutationFn: async (orderData: any) => {
       return apiRequest("POST", "/api/orders", orderData);
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
+      // Store order in localStorage for customer tracking
+      if (response?.orderId) {
+        CustomerService.storeOrder({
+          orderId: response.orderId,
+          productId: product!.id,
+          productName: product!.name,
+          productPrice: product!.price,
+          pickupLocation: formData.pickupLocation,
+          pickupTime: formData.pickupTime,
+        });
+      }
+      
       toast({
         title: "Order placed successfully!",
-        description: "You'll receive an email confirmation shortly.",
+        description: "You'll receive an email confirmation shortly. You can track your order in the My Orders section.",
       });
       setLocation("/");
     },
@@ -62,9 +75,20 @@ export default function OrderPage() {
     
     if (!product) return;
 
+    // Generate customer ID and sync customer data
+    const customerId = CustomerService.getCustomerId();
+    CustomerService.syncCustomerFromOrder({
+      buyerName: formData.buyerName,
+      buyerEmail: formData.buyerEmail,
+      buyerPhone: formData.buyerPhone,
+      buyerClass: parseInt(formData.buyerClass),
+      buyerSection: formData.buyerSection,
+    });
+
     const orderData = {
       productId: product.id,
       ...formData,
+      buyerId: customerId,
       buyerClass: parseInt(formData.buyerClass),
       amount: product.price.toString(),
       recaptchaToken: "dummy-token",

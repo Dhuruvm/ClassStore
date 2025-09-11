@@ -302,6 +302,149 @@ export class EnhancedEmailService {
     }
   }
 
+  async sendCancellationConfirmation(order: any, product: any, reason: string) {
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">Order Cancelled ❌</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Your order has been cancelled successfully</p>
+        </div>
+        
+        <!-- Content -->
+        <div style="padding: 40px 30px;">
+          <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+            Hi ${order.buyerName}, your order has been cancelled as requested. No payment is required and you don't need to pick up the item.
+          </p>
+          
+          <!-- Product Card -->
+          <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 12px; padding: 30px; margin: 30px 0;">
+            <h2 style="color: #991b1b; margin: 0 0 20px 0; font-size: 22px; font-weight: 600;">${product.name}</h2>
+            <div style="display: grid; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fecaca;">
+                <span style="color: #7f1d1d; font-weight: 500;">Order ID:</span>
+                <span style="font-family: monospace; color: #991b1b; font-weight: 600;">${order.id}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fecaca;">
+                <span style="color: #7f1d1d; font-weight: 500;">Amount:</span>
+                <span style="color: #991b1b; font-weight: 700; font-size: 18px;">₹${order.amount}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fecaca;">
+                <span style="color: #7f1d1d; font-weight: 500;">Reason:</span>
+                <span style="color: #991b1b; font-weight: 600;">${reason}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                <span style="color: #7f1d1d; font-weight: 500;">Cancelled By:</span>
+                <span style="color: #991b1b; font-weight: 600;">You (Customer)</span>
+              </div>
+            </div>
+          </div>
+          
+          <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin-top: 30px;">
+            This cancellation is final. If you change your mind, you'll need to place a new order (if the item is still available).
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.SITE_URL || 'http://localhost:5000'}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">🛒 Browse More Products</a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      const result = await this.sendTransactionalEmail({
+        to: order.buyerEmail,
+        toName: order.buyerName,
+        subject: `Order Cancelled - ${product.name}`,
+        htmlContent
+      });
+      console.log("✓ Cancellation confirmation email sent successfully");
+      return result;
+    } catch (error) {
+      console.error("✗ Failed to send cancellation confirmation email:", error);
+      throw error;
+    }
+  }
+
+  async sendCancellationNotification(order: any, product: any, reason: string) {
+    const adminUrl = `${process.env.SITE_URL || 'http://localhost:5000'}/admin/${process.env.ADMIN_URL_PART || 'z3XJbf0x0vXsCxnUZnscBRsnE'}`;
+    
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">📝 Order Cancelled by Customer</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">A customer has cancelled their order</p>
+        </div>
+        
+        <!-- Content -->
+        <div style="padding: 40px 30px;">
+          <!-- Order Details -->
+          <div style="background: #fffbeb; border: 2px solid #fed7aa; border-radius: 12px; padding: 30px; margin: 30px 0;">
+            <h2 style="color: #92400e; margin: 0 0 20px 0; font-size: 22px; font-weight: 600;">${product.name}</h2>
+            <div style="display: grid; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fed7aa;">
+                <span style="color: #78350f; font-weight: 500;">Order ID:</span>
+                <span style="font-family: monospace; color: #92400e; font-weight: 600;">${order.id}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fed7aa;">
+                <span style="color: #78350f; font-weight: 500;">Customer:</span>
+                <span style="color: #92400e; font-weight: 600;">${order.buyerName}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fed7aa;">
+                <span style="color: #78350f; font-weight: 500;">Class & Section:</span>
+                <span style="color: #92400e; font-weight: 600;">Grade ${order.buyerClass} - Section ${order.buyerSection}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fed7aa;">
+                <span style="color: #78350f; font-weight: 500;">Amount:</span>
+                <span style="color: #92400e; font-weight: 700; font-size: 18px;">₹${order.amount}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fed7aa;">
+                <span style="color: #78350f; font-weight: 500;">Email:</span>
+                <span style="color: #92400e; font-weight: 600;">${order.buyerEmail}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fed7aa;">
+                <span style="color: #78350f; font-weight: 500;">Phone:</span>
+                <span style="color: #92400e; font-weight: 600;">${order.buyerPhone}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #fed7aa;">
+                <span style="color: #78350f; font-weight: 500;">Cancellation Reason:</span>
+                <span style="color: #92400e; font-weight: 600; font-style: italic;">"${reason}"</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                <span style="color: #78350f; font-weight: 500;">Cancelled By:</span>
+                <span style="color: #92400e; font-weight: 600;">Customer</span>
+              </div>
+            </div>
+          </div>
+          
+          <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+            The customer has cancelled this order. The product is now available for other customers to purchase.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${adminUrl}" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">📊 View Admin Dashboard</a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      const result = await this.sendTransactionalEmail({
+        to: process.env.ADMIN_EMAIL || process.env.SMTP_USER || "admin@classstore.com",
+        toName: "ClassStore Admin",
+        subject: `📝 Order Cancellation Alert - ${product.name}`,
+        htmlContent,
+        fromName: "ClassStore System"
+      });
+      console.log("✓ Admin cancellation notification email sent successfully");
+      return result;
+    } catch (error) {
+      console.error("✗ Failed to send admin cancellation notification email:", error);
+      throw error;
+    }
+  }
+
   async sendWelcomeEmail(userData: {
     email: string;
     name: string;

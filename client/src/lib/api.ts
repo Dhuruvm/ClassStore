@@ -27,9 +27,13 @@ export const api = {
     });
   },
 
+  getSellerProducts: (sellerId: string) => {
+    return fetch(`/api/sellers/${sellerId}/products`).then(res => res.json());
+  },
+
   // Admin methods
   adminLogin: (credentials: { username: string; password: string }) => {
-    return apiRequest("POST", "/api/admin/login", credentials);
+    return apiRequest("POST", "/api/admin/login", { body: credentials });
   },
 
   setupTotp: () => {
@@ -37,7 +41,7 @@ export const api = {
   },
 
   verifyTotp: (token: string) => {
-    return apiRequest("POST", "/api/admin/verify-totp", { token });
+    return apiRequest("POST", "/api/admin/verify-totp", { body: { token } });
   },
 
   adminLogout: () => {

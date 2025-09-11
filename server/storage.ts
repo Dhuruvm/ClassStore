@@ -30,6 +30,7 @@ export interface IStorage {
   updateOrderStatus(id: string, status: "pending" | "confirmed" | "delivered" | "cancelled", cancelledBy?: string, reason?: string): Promise<void>;
   markOrderDelivered(id: string): Promise<void>;
   cancelOrder(id: string, cancelledBy: string, reason: string): Promise<void>;
+  markInvoiceGenerated(id: string): Promise<void>;
 
   // Admin methods
   getAdmin(id: string): Promise<Admin | undefined>;
@@ -406,6 +407,15 @@ export class MemStorage implements IStorage {
       order.status = "cancelled";
       order.cancelledBy = cancelledBy;
       order.cancellationReason = reason;
+      order.updatedAt = new Date();
+      this.orders.set(id, order);
+    }
+  }
+
+  async markInvoiceGenerated(id: string): Promise<void> {
+    const order = this.orders.get(id);
+    if (order) {
+      order.invoiceGenerated = true;
       order.updatedAt = new Date();
       this.orders.set(id, order);
     }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Upload, Camera, Package, Star, Shield } from "lucide-react";
+import { Upload, Camera, Package, Star, Shield, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,12 +24,17 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { insertProductSchema, type InsertProduct } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { SellerService } from "@/lib/seller";
 
 export default function Sell() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Get existing seller info or prepare for new seller
+  const existingSeller = SellerService.getSellerInfo();
 
   const form = useForm<InsertProduct>({
     resolver: zodResolver(insertProductSchema),
@@ -41,42 +46,86 @@ export default function Sell() {
       section: "",
       category: "Textbook",
       condition: "Good",
-      sellerName: "",
-      sellerPhone: "",
+      sellerName: existingSeller?.name || "",
+      sellerPhone: existingSeller?.phone || "",
+      sellerEmail: existingSeller?.email || "",
     },
   });
 
   const sellMutation = useMutation({
     mutationFn: async (data: InsertProduct & { image?: File }) => {
+      // Get or create seller
+      const seller = SellerService.getOrCreateSeller({
+        name: data.sellerName,
+        email: data.sellerEmail || "",
+        phone: data.sellerPhone,
+      });
+      
       const formData = new FormData();
       Object.entries(data).forEach(([key, value]) => {
-        if (key !== "image" && value !== undefined) {
+        if (key !== "image" && value !== undefined && value !== null) {
           formData.append(key, value.toString());
         }
       });
+      
+      // Add seller ID to the form data
+      formData.append("sellerId", seller.id);
+      
       if (data.image) {
         formData.append("image", data.image);
       }
-      return await apiRequest("POST", "/api/products", {
+      
+      const response = await apiRequest("POST", "/api/products", {
         body: formData,
         isFormData: true,
       });
+      
+      const responseData = await response.json();
+      
+      // Add product to local storage for tracking
+      SellerService.addProductToLocal({
+        id: responseData.productId || `temp_${Date.now()}`,
+        name: data.name,
+        price: data.price,
+        class: data.class,
+        category: data.category || 'Textbook',
+        condition: data.condition || 'Good',
+        approvalStatus: 'pending',
+        uploadedAt: new Date().toISOString(),
+      });
+      
+      return response;
     },
     onSuccess: () => {
+      setUploadSuccess(true);
       toast({
-        title: "LISTED SUCCESSFULLY!",
-        description: "Your item is now live on the marketplace.",
+        title: "ITEM UPLOADED SUCCESSFULLY!",
+        description: "Your item is under review. Check your seller dashboard for updates.",
       });
-      form.reset();
+      form.reset({
+        name: "",
+        description: "",
+        price: "",
+        class: 6,
+        section: "",
+        category: "Textbook",
+        condition: "Good",
+        sellerName: existingSeller?.name || "",
+        sellerPhone: existingSeller?.phone || "",
+        sellerEmail: existingSeller?.email || "",
+      });
       setImageFile(null);
       setImagePreview("");
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      
+      // Reset success state after 5 seconds
+      setTimeout(() => setUploadSuccess(false), 5000);
     },
     onError: (error) => {
       toast({
         variant: "destructive",
-        title: "LISTING FAILED",
-        description: error.message || "Failed to list your item",
+        title: "UPLOAD FAILED",
+        description: error.message || "Failed to upload your item",
       });
     },
   });
@@ -94,8 +143,47 @@ export default function Sell() {
   };
 
   const onSubmit = (data: InsertProduct) => {
+    if (!data.sellerName || !data.sellerPhone) {
+      toast({
+        variant: "destructive",
+        title: "MISSING INFORMATION",
+        description: "Please provide your name and phone number.",
+      });
+      return;
+    }
     sellMutation.mutate({ ...data, image: imageFile || undefined });
   };
+
+  if (uploadSuccess) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center bg-white rounded-lg p-8 m-4">
+          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-6" />
+          <h2 className="text-2xl font-black text-black mb-4">UPLOAD SUCCESSFUL!</h2>
+          <p className="text-gray-600 mb-6">
+            Your item is now under review. You'll be notified once it's approved and live on the marketplace.
+          </p>
+          <div className="space-y-3">
+            <Button 
+              onClick={() => setUploadSuccess(false)}
+              className="w-full bg-black text-white hover:bg-gray-800 font-semibold"
+              data-testid="button-upload-another"
+            >
+              UPLOAD ANOTHER ITEM
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => window.location.href = '/dashboard'}
+              className="w-full border-black text-black hover:bg-gray-50 font-semibold"
+              data-testid="button-view-dashboard"
+            >
+              VIEW DASHBOARD
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black">
@@ -240,7 +328,7 @@ export default function Sell() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-lg font-bold">CATEGORY *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger className="text-lg py-3 border-2 border-gray-300 focus:border-black" data-testid="select-category">
                               <SelectValue placeholder="Select category" />
@@ -268,7 +356,7 @@ export default function Sell() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-lg font-bold">CONDITION *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger className="text-lg py-3 border-2 border-gray-300 focus:border-black" data-testid="select-condition">
                               <SelectValue placeholder="Select condition" />
@@ -343,6 +431,7 @@ export default function Sell() {
                           placeholder="Describe the condition, features, or any details about your item..."
                           rows={4}
                           {...field}
+                          value={field.value || ''}
                           className="text-lg py-3 border-2 border-gray-300 focus:border-black"
                           data-testid="input-description"
                         />
@@ -356,7 +445,7 @@ export default function Sell() {
               {/* Seller Information */}
               <div className="bg-gray-50 p-8 rounded-lg">
                 <h3 className="text-2xl font-black text-black mb-6">SELLER INFORMATION</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <FormField
                     control={form.control}
                     name="sellerName"
@@ -395,6 +484,27 @@ export default function Sell() {
                     )}
                   />
                 </div>
+                
+                <FormField
+                  control={form.control}
+                  name="sellerEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-bold">EMAIL (OPTIONAL)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="your.email@example.com"
+                          type="email"
+                          {...field}
+                          value={field.value || ''}
+                          className="text-lg py-3 border-2 border-gray-300 focus:border-black"
+                          data-testid="input-seller-email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               {/* Submit Button - Nike Style */}

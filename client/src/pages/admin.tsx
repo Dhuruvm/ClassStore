@@ -43,9 +43,18 @@ interface OrderWithProduct {
   buyerSection: string;
   buyerEmail: string;
   buyerPhone: string;
+  buyerId?: string;
+  pickupLocation: string;
+  pickupTime: string;
+  additionalNotes?: string;
   amount: string;
-  status: "pending" | "confirmed" | "cancelled";
+  status: "pending" | "confirmed" | "delivered" | "cancelled";
+  cancelledBy?: string;
+  cancellationReason?: string;
+  deliveryConfirmedAt?: string;
+  invoiceGenerated: boolean;
   createdAt: string;
+  updatedAt: string;
   product: {
     id: string;
     name: string;
@@ -86,6 +95,15 @@ export default function Admin() {
   const [productImagePreview, setProductImagePreview] = useState<string>("");
   const [productFormErrors, setProductFormErrors] = useState<Record<string, string>>({});
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  
+  // Order management state
+  const [orderSearchTerm, setOrderSearchTerm] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  const [orderDateFilter, setOrderDateFilter] = useState("all");
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<OrderWithProduct | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
 
   // Check authentication status on mount
   useEffect(() => {
@@ -191,6 +209,34 @@ export default function Admin() {
     return matchesSearch && matchesStatus;
   });
 
+  // Filter orders based on search term, status, and date
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch = orderSearchTerm === "" || 
+      order.buyerName.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+      order.buyerEmail.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+      order.product.name.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+      order.product.sellerName.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+      order.pickupLocation.toLowerCase().includes(orderSearchTerm.toLowerCase());
+
+    const matchesStatus = orderStatusFilter === "all" || order.status === orderStatusFilter;
+
+    const matchesDate = orderDateFilter === "all" || (() => {
+      const orderDate = new Date(order.createdAt);
+      const now = new Date();
+      const diffTime = now.getTime() - orderDate.getTime();
+      const diffDays = diffTime / (1000 * 3600 * 24);
+
+      switch (orderDateFilter) {
+        case "today": return diffDays <= 1;
+        case "week": return diffDays <= 7;
+        case "month": return diffDays <= 30;
+        default: return true;
+      }
+    })();
+
+    return matchesSearch && matchesStatus && matchesDate;
+  });
+
   // Order actions
   const confirmOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -204,13 +250,39 @@ export default function Admin() {
   });
 
   const cancelOrderMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      return apiRequest("POST", `/api/admin/orders/${orderId}/cancel`);
+    mutationFn: async ({ orderId, reason }: { orderId: string; reason?: string }) => {
+      return apiRequest("POST", `/api/admin/orders/${orderId}/cancel`, { body: { reason } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       toast({ title: "Order cancelled successfully" });
+      setCancellationReason("");
+      setShowOrderDetailsModal(false);
+    },
+  });
+
+  const deliverOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      return apiRequest("POST", `/api/admin/orders/${orderId}/deliver`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Order marked as delivered successfully" });
+      setShowOrderDetailsModal(false);
+    },
+  });
+
+  const bulkUpdateOrdersMutation = useMutation({
+    mutationFn: async ({ orderIds, status, reason }: { orderIds: string[]; status: string; reason?: string }) => {
+      return apiRequest("POST", "/api/admin/orders/bulk-update", { body: { orderIds, status, reason } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      setSelectedOrders([]);
+      toast({ title: "Orders updated successfully" });
     },
   });
 
@@ -292,6 +364,42 @@ export default function Admin() {
     );
   };
 
+  // Order management helper functions
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  const handleSelectAllOrders = () => {
+    setSelectedOrders(
+      selectedOrders.length === filteredOrders.length 
+        ? [] 
+        : filteredOrders.map(o => o.id)
+    );
+  };
+
+  const handleViewOrderDetails = (order: OrderWithProduct) => {
+    setSelectedOrderDetails(order);
+    setShowOrderDetailsModal(true);
+  };
+
+  const getOrderStatusColor = (status: string) => {
+    switch (status) {
+      case "pending": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+      case "confirmed": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+      case "delivered": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+      case "cancelled": return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+      default: return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+    }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/admin/products/${id}`);
@@ -307,7 +415,7 @@ export default function Admin() {
     mutationFn: async (data: any) => {
       const formData = new FormData();
       Object.entries(data).forEach(([key, value]) => {
-        if (key !== "image" && value !== undefined) {
+        if (key !== "image" && value !== undefined && value !== null) {
           formData.append(key, value.toString());
         }
       });
@@ -335,7 +443,7 @@ export default function Admin() {
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const formData = new FormData();
       Object.entries(data).forEach(([key, value]) => {
-        if (key !== "image" && value !== undefined) {
+        if (key !== "image" && value !== undefined && value !== null) {
           formData.append(key, value.toString());
         }
       });
@@ -493,8 +601,72 @@ export default function Admin() {
     }
   };
 
+  // Invoice management mutations
+  const downloadInvoiceMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await fetch(`/api/admin/orders/${orderId}/invoice`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download invoice: ${response.statusText}`);
+      }
+      
+      return { orderId, response };
+    },
+    onSuccess: async ({ orderId, response }) => {
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ClassStore-Invoice-${orderId.slice(-8).toUpperCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({ 
+        title: "Invoice downloaded", 
+        description: "PDF invoice has been generated and downloaded successfully" 
+      });
+      
+      // Refresh orders to update invoice status
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Download failed", 
+        description: error instanceof Error ? error.message : "Failed to download invoice",
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const bulkGenerateInvoicesMutation = useMutation({
+    mutationFn: async (orderIds: string[]) => {
+      return apiRequest("POST", "/api/admin/invoices/generate-bulk", { body: { orderIds } });
+    },
+    onSuccess: (data: any) => {
+      const { results } = data;
+      toast({ 
+        title: "Bulk invoice generation completed", 
+        description: `Generated: ${results.generated}, Already existed: ${results.alreadyExists}, Failed: ${results.failed}` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      setSelectedOrders([]);
+    },
+    onError: () => {
+      toast({ 
+        title: "Bulk generation failed", 
+        description: "Failed to generate invoices in bulk",
+        variant: "destructive" 
+      });
+    }
+  });
+
   const downloadInvoice = (orderId: string) => {
-    window.open(`/api/admin/orders/${orderId}/invoice`, '_blank');
+    downloadInvoiceMutation.mutate(orderId);
   };
 
   const getStatusColor = (status: string) => {
@@ -738,94 +910,234 @@ export default function Admin() {
             </div>
           </TabsContent>
 
-          {/* Orders Tab */}
+          {/* Enhanced Orders Tab */}
           <TabsContent value="orders" className="space-y-6">
             <Card data-testid="table-orders">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Order Management</span>
+                  <span className="flex items-center space-x-2">
+                    <ShoppingCart className="h-5 w-5" />
+                    <span>Order Management</span>
+                    <Badge variant="outline" className="ml-2">
+                      {filteredOrders.length} of {orders.length} orders
+                    </Badge>
+                  </span>
                   <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="sm">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filter
-                    </Button>
-                    <Button variant="outline" size="sm">
+                    {selectedOrders.length > 0 && (
+                      <div className="flex items-center space-x-2 mr-4 p-2 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                          {selectedOrders.length} selected
+                        </span>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => bulkUpdateOrdersMutation.mutate({ orderIds: selectedOrders, status: "confirmed" })}
+                          disabled={bulkUpdateOrdersMutation.isPending}
+                          data-testid="button-bulk-confirm"
+                        >
+                          Confirm
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => bulkUpdateOrdersMutation.mutate({ orderIds: selectedOrders, status: "delivered" })}
+                          disabled={bulkUpdateOrdersMutation.isPending}
+                          data-testid="button-bulk-deliver"
+                        >
+                          Deliver
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => bulkGenerateInvoicesMutation.mutate(selectedOrders)}
+                          disabled={bulkGenerateInvoicesMutation.isPending}
+                          data-testid="button-bulk-generate-invoices"
+                          title="Generate PDF invoices for selected orders"
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Generate Invoices
+                        </Button>
+                      </div>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] })}
+                      data-testid="button-refresh-orders"
+                    >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
                     </Button>
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Filters and Search */}
+                <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="flex-1 min-w-64">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                      <Input 
+                        placeholder="Search orders (buyer, product, pickup location)..." 
+                        className="pl-10"
+                        value={orderSearchTerm}
+                        onChange={(e) => setOrderSearchTerm(e.target.value)}
+                        data-testid="input-search-orders"
+                      />
+                    </div>
+                  </div>
+                  <Select value={orderStatusFilter} onValueChange={setOrderStatusFilter}>
+                    <SelectTrigger className="w-48" data-testid="select-order-status">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="delivered">Delivered</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={orderDateFilter} onValueChange={setOrderDateFilter}>
+                    <SelectTrigger className="w-48" data-testid="select-order-date">
+                      <SelectValue placeholder="Filter by date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-muted/50">
                       <tr>
-                        <th className="text-left p-4 font-medium">Order ID</th>
-                        <th className="text-left p-4 font-medium">Product</th>
-                        <th className="text-left p-4 font-medium">Buyer</th>
-                        <th className="text-left p-4 font-medium">Amount</th>
-                        <th className="text-left p-4 font-medium">Status</th>
+                        <th className="text-left p-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                            onChange={handleSelectAllOrders}
+                            className="rounded"
+                            data-testid="checkbox-select-all-orders"
+                          />
+                        </th>
+                        <th className="text-left p-4 font-medium">Order Details</th>
+                        <th className="text-left p-4 font-medium">Buyer Information</th>
+                        <th className="text-left p-4 font-medium">Pickup Details</th>
+                        <th className="text-left p-4 font-medium">Status & Timing</th>
                         <th className="text-left p-4 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {orders.map((order) => (
+                      {filteredOrders.map((order) => (
                         <tr key={order.id} className="border-b border-border hover:bg-muted/50" data-testid={`row-order-${order.id}`}>
-                          <td className="p-4 font-mono text-sm" data-testid={`text-order-id-${order.id}`}>
-                            #{order.id.slice(-8)}
+                          <td className="p-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedOrders.includes(order.id)}
+                              onChange={() => handleSelectOrder(order.id)}
+                              className="rounded"
+                              data-testid={`checkbox-select-${order.id}`}
+                            />
                           </td>
-                          <td className="p-4" data-testid={`text-product-name-${order.id}`}>
-                            {order.product.name}
-                          </td>
-                          <td className="p-4" data-testid={`text-buyer-name-${order.id}`}>
-                            <div>
-                              <div className="font-medium">{order.buyerName}</div>
-                              <div className="text-sm text-muted-foreground">{order.buyerEmail}</div>
+                          <td className="p-4" data-testid={`cell-order-details-${order.id}`}>
+                            <div className="space-y-1">
+                              <div className="font-mono text-sm text-muted-foreground">#{order.id.slice(-8)}</div>
+                              <div className="font-medium">{order.product.name}</div>
+                              <div className="text-sm text-muted-foreground">by {order.product.sellerName}</div>
+                              <div className="font-semibold text-green-600">₹{order.amount}</div>
                             </div>
                           </td>
-                          <td className="p-4 font-semibold" data-testid={`text-order-amount-${order.id}`}>
-                            ₹{order.amount}
+                          <td className="p-4" data-testid={`cell-buyer-info-${order.id}`}>
+                            <div className="space-y-1">
+                              <div className="font-medium">{order.buyerName}</div>
+                              <div className="text-sm text-muted-foreground">{order.buyerEmail}</div>
+                              <div className="text-sm">{order.buyerPhone}</div>
+                              <div className="text-sm">Class {order.buyerClass}, Section {order.buyerSection}</div>
+                            </div>
                           </td>
-                          <td className="p-4">
-                            <Badge className={getStatusColor(order.status)} data-testid={`badge-status-${order.id}`}>
-                              {order.status}
-                            </Badge>
+                          <td className="p-4" data-testid={`cell-pickup-details-${order.id}`}>
+                            <div className="space-y-1">
+                              <div className="font-medium">{order.pickupLocation}</div>
+                              <div className="text-sm text-muted-foreground">{order.pickupTime}</div>
+                              {order.additionalNotes && (
+                                <div className="text-sm italic text-muted-foreground max-w-xs">
+                                  "{order.additionalNotes}"
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4" data-testid={`cell-status-timing-${order.id}`}>
+                            <div className="space-y-2">
+                              <Badge className={getOrderStatusColor(order.status)}>
+                                {order.status}
+                              </Badge>
+                              <div className="text-xs text-muted-foreground space-y-1">
+                                <div>Created: {formatDateTime(order.createdAt)}</div>
+                                {order.deliveryConfirmedAt && (
+                                  <div>Delivered: {formatDateTime(order.deliveryConfirmedAt)}</div>
+                                )}
+                                {order.cancelledBy && (
+                                  <div className="text-red-600">
+                                    Cancelled by: {order.cancelledBy}
+                                    {order.cancellationReason && (
+                                      <div>Reason: {order.cancellationReason}</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="p-4">
                             <div className="flex space-x-2">
-                              {order.status === "pending" && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    className="bg-green-600 hover:bg-green-700"
-                                    onClick={() => confirmOrderMutation.mutate(order.id)}
-                                    disabled={confirmOrderMutation.isPending}
-                                    data-testid={`button-confirm-${order.id}`}
-                                  >
-                                    <CheckCircle className="h-4 w-4 mr-1" />
-                                    Confirm
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => cancelOrderMutation.mutate(order.id)}
-                                    disabled={cancelOrderMutation.isPending}
-                                    data-testid={`button-cancel-${order.id}`}
-                                  >
-                                    <XCircle className="h-4 w-4 mr-1" />
-                                    Cancel
-                                  </Button>
-                                </>
-                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => downloadInvoice(order.id)}
-                                data-testid={`button-download-${order.id}`}
+                                onClick={() => handleViewOrderDetails(order)}
+                                data-testid={`button-view-details-${order.id}`}
                               >
-                                <Download className="h-4 w-4" />
+                                <Eye className="h-4 w-4" />
                               </Button>
+                              {order.status === "pending" && (
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700"
+                                  onClick={() => confirmOrderMutation.mutate(order.id)}
+                                  disabled={confirmOrderMutation.isPending}
+                                  data-testid={`button-confirm-${order.id}`}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {order.status === "confirmed" && (
+                                <Button
+                                  size="sm"
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                  onClick={() => deliverOrderMutation.mutate(order.id)}
+                                  disabled={deliverOrderMutation.isPending}
+                                  data-testid={`button-deliver-${order.id}`}
+                                >
+                                  <Clock className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {(order.status === "confirmed" || order.status === "delivered" || order.invoiceGenerated) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => downloadInvoice(order.id)}
+                                  disabled={downloadInvoiceMutation.isPending}
+                                  data-testid={`button-download-invoice-${order.id}`}
+                                  title="Download PDF Invoice"
+                                >
+                                  <Download className="h-4 w-4" />
+                                  {downloadInvoiceMutation.isPending && downloadInvoiceMutation.variables === order.id && (
+                                    <div className="ml-1 animate-spin">⟳</div>
+                                  )}
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -833,10 +1145,15 @@ export default function Admin() {
                     </tbody>
                   </table>
                   
-                  {orders.length === 0 && (
+                  {filteredOrders.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground" data-testid="text-no-orders">
-                      <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>No orders found</p>
+                      {orderSearchTerm || orderStatusFilter !== "all" || orderDateFilter !== "all" ? (
+                        <p className="text-sm mt-2">Try adjusting your search filters</p>
+                      ) : (
+                        <p className="text-sm mt-2">Orders will appear here when customers make purchases</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1732,6 +2049,278 @@ export default function Admin() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Details Modal */}
+      <Dialog open={showOrderDetailsModal} onOpenChange={setShowOrderDetailsModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Order Details</DialogTitle>
+          </DialogHeader>
+          
+          {selectedOrderDetails && (
+            <div className="space-y-6">
+              {/* Order Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center space-x-2">
+                      <ShoppingCart className="h-5 w-5" />
+                      <span>Order #{selectedOrderDetails.id.slice(-8)}</span>
+                    </span>
+                    <Badge className={getOrderStatusColor(selectedOrderDetails.status)}>
+                      {selectedOrderDetails.status}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Product Information */}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-lg">Product Information</h4>
+                      <div className="space-y-2">
+                        <div>
+                          <span className="font-medium">Product:</span>
+                          <span className="ml-2">{selectedOrderDetails.product.name}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">Seller:</span>
+                          <span className="ml-2">{selectedOrderDetails.product.sellerName}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">Amount:</span>
+                          <span className="ml-2 font-semibold text-green-600">₹{selectedOrderDetails.amount}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Timing */}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-lg">Order Timeline</h4>
+                      <div className="space-y-2">
+                        <div>
+                          <span className="font-medium">Created:</span>
+                          <span className="ml-2">{formatDateTime(selectedOrderDetails.createdAt)}</span>
+                        </div>
+                        {selectedOrderDetails.deliveryConfirmedAt && (
+                          <div>
+                            <span className="font-medium">Delivered:</span>
+                            <span className="ml-2">{formatDateTime(selectedOrderDetails.deliveryConfirmedAt)}</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-medium">Invoice:</span>
+                          <span className="ml-2">{selectedOrderDetails.invoiceGenerated ? "Generated" : "Pending"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Buyer Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Users className="h-5 w-5" />
+                    <span>Buyer Information</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Name:</span>
+                        <span className="ml-2">{selectedOrderDetails.buyerName}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Email:</span>
+                        <span className="ml-2">{selectedOrderDetails.buyerEmail}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Phone:</span>
+                        <span className="ml-2">{selectedOrderDetails.buyerPhone}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Class:</span>
+                        <span className="ml-2">{selectedOrderDetails.buyerClass}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Section:</span>
+                        <span className="ml-2">{selectedOrderDetails.buyerSection}</span>
+                      </div>
+                      {selectedOrderDetails.buyerId && (
+                        <div>
+                          <span className="font-medium">Buyer ID:</span>
+                          <span className="ml-2 font-mono text-sm">{selectedOrderDetails.buyerId}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Pickup Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Clock className="h-5 w-5" />
+                    <span>Pickup Details</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-medium">Location:</span>
+                      <span className="ml-2">{selectedOrderDetails.pickupLocation}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Preferred Time:</span>
+                      <span className="ml-2">{selectedOrderDetails.pickupTime}</span>
+                    </div>
+                    {selectedOrderDetails.additionalNotes && (
+                      <div>
+                        <span className="font-medium">Additional Notes:</span>
+                        <div className="mt-2 p-3 bg-muted rounded-lg">
+                          <p className="text-sm italic">{selectedOrderDetails.additionalNotes}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cancellation Details */}
+              {selectedOrderDetails.status === "cancelled" && (
+                <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-red-700 dark:text-red-300">
+                      <XCircle className="h-5 w-5" />
+                      <span>Cancellation Details</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Cancelled By:</span>
+                        <span className="ml-2">{selectedOrderDetails.cancelledBy}</span>
+                      </div>
+                      {selectedOrderDetails.cancellationReason && (
+                        <div>
+                          <span className="font-medium">Reason:</span>
+                          <div className="mt-2 p-3 bg-red-100 dark:bg-red-800/30 rounded-lg">
+                            <p className="text-sm">{selectedOrderDetails.cancellationReason}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center pt-4 border-t">
+                <div className="space-x-2">
+                  {selectedOrderDetails.status === "pending" && (
+                    <>
+                      <Button
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => confirmOrderMutation.mutate(selectedOrderDetails.id)}
+                        disabled={confirmOrderMutation.isPending}
+                        data-testid="button-modal-confirm"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {confirmOrderMutation.isPending ? "Confirming..." : "Confirm Order"}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          setCancellationReason("");
+                        }}
+                        data-testid="button-modal-cancel-setup"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancel Order
+                      </Button>
+                    </>
+                  )}
+                  
+                  {selectedOrderDetails.status === "confirmed" && (
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={() => deliverOrderMutation.mutate(selectedOrderDetails.id)}
+                      disabled={deliverOrderMutation.isPending}
+                      data-testid="button-modal-deliver"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      {deliverOrderMutation.isPending ? "Marking Delivered..." : "Mark as Delivered"}
+                    </Button>
+                  )}
+
+                  {selectedOrderDetails.invoiceGenerated && (
+                    <Button
+                      variant="outline"
+                      onClick={() => downloadInvoice(selectedOrderDetails.id)}
+                      data-testid="button-modal-download"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Invoice
+                    </Button>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setShowOrderDetailsModal(false)}
+                  data-testid="button-modal-close"
+                >
+                  Close
+                </Button>
+              </div>
+
+              {/* Cancellation Reason Input */}
+              {cancellationReason !== null && selectedOrderDetails.status === "pending" && (
+                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-900/20">
+                  <CardHeader>
+                    <CardTitle className="text-orange-700 dark:text-orange-300">Cancel Order</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="cancellation-reason">Reason for Cancellation</Label>
+                      <Textarea
+                        id="cancellation-reason"
+                        placeholder="Please provide a reason for cancelling this order..."
+                        value={cancellationReason}
+                        onChange={(e) => setCancellationReason(e.target.value)}
+                        rows={3}
+                        data-testid="textarea-cancellation-reason"
+                      />
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="destructive"
+                        onClick={() => cancelOrderMutation.mutate({ orderId: selectedOrderDetails.id, reason: cancellationReason })}
+                        disabled={cancelOrderMutation.isPending || !cancellationReason.trim()}
+                        data-testid="button-modal-confirm-cancel"
+                      >
+                        {cancelOrderMutation.isPending ? "Cancelling..." : "Confirm Cancellation"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setCancellationReason("")}
+                        data-testid="button-modal-cancel-cancel"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
