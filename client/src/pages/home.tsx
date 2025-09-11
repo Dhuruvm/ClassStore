@@ -216,7 +216,7 @@ export default function Home() {
               {products.length > 2 && (
                 <div>
                   <h3 className="text-lg font-semibold text-black mb-6">Just In</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-8">
                     {products.slice(2, 4).map((product: Product) => (
                       <ProductCard 
                         key={product.id}
@@ -233,7 +233,7 @@ export default function Home() {
             {products.length > 4 && (
               <div>
                 <h2 className="text-2xl font-bold text-black mb-8">All Items</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
                   {products.slice(4).map((product: Product) => (
                     <ProductCard 
                       key={product.id}
