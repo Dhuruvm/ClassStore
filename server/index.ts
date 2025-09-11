@@ -21,38 +21,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Simple rate limiting middleware (demonstration)
-const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
-  const now = Date.now();
-  const windowMs = 60000; // 1 minute window
-  const maxRequests = 100; // Max requests per window
-  
-  if (!rateLimitMap.has(clientIP)) {
-    rateLimitMap.set(clientIP, { count: 1, lastReset: now });
-  } else {
-    const clientData = rateLimitMap.get(clientIP)!;
-    
-    // Reset counter if window has passed
-    if (now - clientData.lastReset > windowMs) {
-      clientData.count = 1;
-      clientData.lastReset = now;
-    } else {
-      clientData.count++;
-    }
-    
-    // Check if rate limit exceeded
-    if (clientData.count > maxRequests) {
-      return res.status(429).json({ 
-        message: "Rate limit exceeded. Try again later.",
-        retryAfter: Math.ceil((windowMs - (now - clientData.lastReset)) / 1000)
-      });
-    }
-  }
-  
-  next();
-});
+// Rate limiting removed
 
 app.use((req, res, next) => {
   const start = Date.now();
