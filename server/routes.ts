@@ -503,6 +503,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk product operations
+  app.patch("/api/admin/products/bulk", requireAdminAuth, async (req, res) => {
+    try {
+      const { z } = require("zod");
+      
+      const schema = z.object({
+        productIds: z.array(z.string()).min(1, "At least one product ID is required"),
+        updates: z.object({
+          isActive: z.boolean().optional(),
+          isSoldOut: z.boolean().optional(),
+        }),
+      });
+
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid request data", 
+          errors: validation.error.issues 
+        });
+      }
+
+      const { productIds, updates } = validation.data;
+
+      // Update each product with the provided updates
+      let successCount = 0;
+      let failureCount = 0;
+      
+      for (const id of productIds) {
+        try {
+          await storage.updateProductStatus(id, updates);
+          successCount++;
+        } catch (error) {
+          failureCount++;
+        }
+      }
+
+      res.json({ 
+        message: `${successCount} products updated successfully`,
+        success: successCount,
+        failed: failureCount,
+        total: productIds.length
+      });
+    } catch (error) {
+      console.error("Bulk product update error:", error);
+      res.status(500).json({ message: "Failed to update products" });
+    }
+  });
+
+  app.delete("/api/admin/products/bulk", requireAdminAuth, async (req, res) => {
+    try {
+      const { z } = require("zod");
+      
+      const schema = z.object({
+        productIds: z.array(z.string()).min(1, "At least one product ID is required"),
+      });
+
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid request data", 
+          errors: validation.error.issues 
+        });
+      }
+
+      const { productIds } = validation.data;
+
+      // Delete each product
+      let successCount = 0;
+      let failureCount = 0;
+      
+      for (const id of productIds) {
+        try {
+          await storage.deleteProduct(id);
+          successCount++;
+        } catch (error) {
+          failureCount++;
+        }
+      }
+
+      res.json({ 
+        message: `${successCount} products deleted successfully`,
+        success: successCount,
+        failed: failureCount,
+        total: productIds.length
+      });
+    } catch (error) {
+      console.error("Bulk product delete error:", error);
+      res.status(500).json({ message: "Failed to delete products" });
+    }
+  });
+
   // System management routes
   app.post("/api/admin/clear-cache", requireAdminAuth, async (req, res) => {
     try {

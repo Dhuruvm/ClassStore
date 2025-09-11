@@ -69,6 +69,8 @@ export default function Admin() {
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showEditProductModal, setShowEditProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [productStatusFilter, setProductStatusFilter] = useState("all");
   const [productForm, setProductForm] = useState({
     name: "",
     description: "",
@@ -82,6 +84,8 @@ export default function Admin() {
   });
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
   const [productImagePreview, setProductImagePreview] = useState<string>("");
+  const [productFormErrors, setProductFormErrors] = useState<Record<string, string>>({});
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -172,6 +176,21 @@ export default function Admin() {
     enabled: authState === "authenticated",
   });
 
+  // Filter products based on search term and status
+  const filteredProducts = adminProducts.filter((product) => {
+    const matchesSearch = productSearchTerm === "" || 
+      product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+      product.sellerName.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+      product.category.toLowerCase().includes(productSearchTerm.toLowerCase());
+
+    const matchesStatus = productStatusFilter === "all" ||
+      (productStatusFilter === "active" && product.isActive && !product.isSoldOut) ||
+      (productStatusFilter === "inactive" && !product.isActive) ||
+      (productStatusFilter === "sold" && product.isSoldOut);
+
+    return matchesSearch && matchesStatus;
+  });
+
   // Order actions
   const confirmOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -231,6 +250,47 @@ export default function Admin() {
       toast({ title: "Product updated successfully" });
     },
   });
+
+  // Bulk operations
+  const bulkUpdateProductsMutation = useMutation({
+    mutationFn: async ({ productIds, updates }: { productIds: string[]; updates: { isActive?: boolean; isSoldOut?: boolean } }) => {
+      return apiRequest("PATCH", "/api/admin/products/bulk", { body: { productIds, updates } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      setSelectedProducts([]);
+      toast({ title: "Products updated successfully" });
+    },
+  });
+
+  const bulkDeleteProductsMutation = useMutation({
+    mutationFn: async (productIds: string[]) => {
+      return apiRequest("DELETE", "/api/admin/products/bulk", { body: { productIds } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      setSelectedProducts([]);
+      toast({ title: "Products deleted successfully" });
+    },
+  });
+
+  const handleSelectProduct = (productId: string) => {
+    setSelectedProducts(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const handleSelectAllProducts = () => {
+    setSelectedProducts(
+      selectedProducts.length === filteredProducts.length 
+        ? [] 
+        : filteredProducts.map(p => p.id)
+    );
+  };
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -357,6 +417,24 @@ export default function Admin() {
     setProductImageFile(null);
     setProductImagePreview("");
     setEditingProduct(null);
+    setProductFormErrors({});
+  };
+
+  const validateProductForm = () => {
+    const errors: Record<string, string> = {};
+    
+    if (!productForm.name.trim()) errors.name = "Product name is required";
+    if (!productForm.price.trim()) errors.price = "Price is required";
+    if (isNaN(parseFloat(productForm.price)) || parseFloat(productForm.price) <= 0) {
+      errors.price = "Price must be a valid positive number";
+    }
+    if (!productForm.section.trim()) errors.section = "Section is required";
+    if (!productForm.sellerName.trim()) errors.sellerName = "Seller name is required";
+    if (!productForm.sellerPhone.trim()) errors.sellerPhone = "Seller phone is required";
+    if (productForm.sellerPhone.length < 10) errors.sellerPhone = "Phone number must be at least 10 digits";
+    
+    setProductFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleProductImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -394,6 +472,15 @@ export default function Admin() {
   };
 
   const submitProductForm = () => {
+    if (!validateProductForm()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the errors before submitting",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const formData = {
       ...productForm,
       image: productImageFile,
@@ -1000,8 +1087,49 @@ export default function Admin() {
                   <span className="flex items-center space-x-2">
                     <Package className="h-5 w-5" />
                     <span>Product Management</span>
+                    <Badge variant="outline" className="ml-2">
+                      {filteredProducts.length} of {adminProducts.length} products
+                    </Badge>
                   </span>
                   <div className="flex items-center space-x-2">
+                    {selectedProducts.length > 0 && (
+                      <div className="flex items-center space-x-2 mr-4 p-2 bg-blue-50 rounded-lg">
+                        <span className="text-sm font-medium text-blue-700">
+                          {selectedProducts.length} selected
+                        </span>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => bulkUpdateProductsMutation.mutate({ productIds: selectedProducts, updates: { isActive: true } })}
+                          disabled={bulkUpdateProductsMutation.isPending}
+                          data-testid="button-bulk-activate"
+                        >
+                          Activate
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => bulkUpdateProductsMutation.mutate({ productIds: selectedProducts, updates: { isActive: false } })}
+                          disabled={bulkUpdateProductsMutation.isPending}
+                          data-testid="button-bulk-deactivate"
+                        >
+                          Deactivate
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete ${selectedProducts.length} products?`)) {
+                              bulkDeleteProductsMutation.mutate(selectedProducts);
+                            }
+                          }}
+                          disabled={bulkDeleteProductsMutation.isPending}
+                          data-testid="button-bulk-delete"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    )}
                     <Button 
                       onClick={handleAddProduct}
                       className="bg-green-600 hover:bg-green-700 text-white"
@@ -1013,10 +1141,16 @@ export default function Admin() {
                     </Button>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input placeholder="Search products..." className="pl-10 w-64" />
+                      <Input 
+                        placeholder="Search products..." 
+                        className="pl-10 w-64" 
+                        value={productSearchTerm}
+                        onChange={(e) => setProductSearchTerm(e.target.value)}
+                        data-testid="input-product-search"
+                      />
                     </div>
-                    <Select defaultValue="all">
-                      <SelectTrigger className="w-32">
+                    <Select value={productStatusFilter} onValueChange={setProductStatusFilter}>
+                      <SelectTrigger className="w-32" data-testid="select-product-status">
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1026,7 +1160,16 @@ export default function Admin() {
                         <SelectItem value="sold">Sold Out</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+                        setProductSearchTerm("");
+                        setProductStatusFilter("all");
+                      }}
+                      data-testid="button-refresh-products"
+                    >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
                     </Button>
@@ -1038,6 +1181,15 @@ export default function Admin() {
                   <table className="w-full">
                     <thead className="bg-muted/50">
                       <tr>
+                        <th className="text-left p-4 font-medium w-12">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                            onChange={handleSelectAllProducts}
+                            className="rounded border-gray-300"
+                            data-testid="checkbox-select-all"
+                          />
+                        </th>
                         <th className="text-left p-4 font-medium">Product</th>
                         <th className="text-left p-4 font-medium">Seller</th>
                         <th className="text-left p-4 font-medium">Price</th>
@@ -1049,8 +1201,17 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {adminProducts.map((product) => (
+                      {filteredProducts.map((product) => (
                         <tr key={product.id} className="border-b border-border hover:bg-muted/50" data-testid={`row-product-${product.id}`}>
+                          <td className="p-4">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedProducts.includes(product.id)}
+                              onChange={() => handleSelectProduct(product.id)}
+                              className="rounded border-gray-300"
+                              data-testid={`checkbox-product-${product.id}`}
+                            />
+                          </td>
                           <td className="p-4" data-testid={`text-product-name-${product.id}`}>
                             <div className="flex items-center space-x-3">
                               {product.imageUrl && (
@@ -1163,6 +1324,14 @@ export default function Admin() {
                     </tbody>
                   </table>
                   
+                  {filteredProducts.length === 0 && adminProducts.length > 0 && (
+                    <div className="text-center py-8 text-muted-foreground" data-testid="text-no-filtered-products">
+                      <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No products match your filters</p>
+                      <p className="text-sm mt-2">Try adjusting your search or filter criteria</p>
+                    </div>
+                  )}
+                  
                   {adminProducts.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground" data-testid="text-no-products">
                       <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -1240,7 +1409,11 @@ export default function Admin() {
                   value={productForm.name}
                   onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g., NCERT Math Textbook"
+                  className={productFormErrors.name ? "border-red-500" : ""}
                 />
+                {productFormErrors.name && (
+                  <p className="text-red-500 text-sm mt-1">{productFormErrors.name}</p>
+                )}
               </div>
               
               <div>
@@ -1250,7 +1423,11 @@ export default function Admin() {
                   value={productForm.price}
                   onChange={(e) => setProductForm(prev => ({ ...prev, price: e.target.value }))}
                   placeholder="299.00"
+                  className={productFormErrors.price ? "border-red-500" : ""}
                 />
+                {productFormErrors.price && (
+                  <p className="text-red-500 text-sm mt-1">{productFormErrors.price}</p>
+                )}
               </div>
 
               <div>
@@ -1331,7 +1508,11 @@ export default function Admin() {
                   value={productForm.sellerPhone}
                   onChange={(e) => setProductForm(prev => ({ ...prev, sellerPhone: e.target.value }))}
                   placeholder="9876543210"
+                  className={productFormErrors.sellerPhone ? "border-red-500" : ""}
                 />
+                {productFormErrors.sellerPhone && (
+                  <p className="text-red-500 text-sm mt-1">{productFormErrors.sellerPhone}</p>
+                )}
               </div>
             </div>
 
