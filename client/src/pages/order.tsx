@@ -21,10 +21,9 @@ export default function OrderPage() {
     buyerSection: "",
     buyerEmail: "",
     buyerPhone: "",
-    buyerAddress: "",
-    buyerCity: "",
-    buyerPincode: "",
-    deliveryInstructions: "",
+    pickupLocation: "School Main Gate",
+    pickupTime: "",
+    additionalNotes: "",
   });
 
   // Fetch product details
@@ -129,7 +128,23 @@ export default function OrderPage() {
           <h1 className="text-3xl font-bold text-gray-800 mb-2" data-testid="text-page-title">
             Complete Your Order
           </h1>
-          <p className="text-gray-600">Fill in your details to purchase this item</p>
+          <p className="text-gray-600">Fill in your details for face-to-face pickup and cash payment</p>
+          
+          {/* Payment & Delivery Info Banner */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+            <div className="flex items-start space-x-3">
+              <div className="text-blue-600 mt-0.5">ℹ️</div>
+              <div>
+                <h3 className="font-semibold text-blue-800 mb-1">Payment & Pickup Information</h3>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• <strong>Payment:</strong> Cash on Delivery (COD) - Pay when you collect the item</li>
+                  <li>• <strong>Pickup:</strong> Face-to-face meeting at school premises</li>
+                  <li>• <strong>Returns:</strong> No returns accepted - Please check item carefully before purchase</li>
+                  <li>• <strong>Validity:</strong> Service available only for our school students</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Product Summary */}
@@ -156,136 +171,172 @@ export default function OrderPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="buyerName" className="font-semibold text-gray-700">Full Name *</Label>
+          {/* Student Information */}
+          <div className="bg-white border rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Student Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="buyerName" className="font-semibold text-gray-700">Full Name *</Label>
+                <Input 
+                  id="buyerName"
+                  type="text" 
+                  required 
+                  value={formData.buyerName}
+                  onChange={(e) => handleInputChange("buyerName", e.target.value)}
+                  className="mt-1"
+                  placeholder="Enter your full name"
+                  data-testid="input-buyer-name"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="buyerClass" className="font-semibold text-gray-700">Class *</Label>
+                <Select 
+                  value={formData.buyerClass} 
+                  onValueChange={(value) => handleInputChange("buyerClass", value)}
+                  required
+                >
+                  <SelectTrigger className="mt-1" data-testid="select-buyer-class">
+                    <SelectValue placeholder="Select your class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">Grade 6</SelectItem>
+                    <SelectItem value="7">Grade 7</SelectItem>
+                    <SelectItem value="8">Grade 8</SelectItem>
+                    <SelectItem value="9">Grade 9</SelectItem>
+                    <SelectItem value="10">Grade 10</SelectItem>
+                    <SelectItem value="11">Grade 11</SelectItem>
+                    <SelectItem value="12">Grade 12</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <Label htmlFor="buyerSection" className="font-semibold text-gray-700">Section *</Label>
               <Input 
-                id="buyerName"
+                id="buyerSection"
                 type="text" 
                 required 
-                value={formData.buyerName}
-                onChange={(e) => handleInputChange("buyerName", e.target.value)}
+                value={formData.buyerSection}
+                onChange={(e) => handleInputChange("buyerSection", e.target.value)}
                 className="mt-1"
-                data-testid="input-buyer-name"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="buyerClass" className="font-semibold text-gray-700">Class *</Label>
-              <Select 
-                value={formData.buyerClass} 
-                onValueChange={(value) => handleInputChange("buyerClass", value)}
-                required
-              >
-                <SelectTrigger className="mt-1" data-testid="select-buyer-class">
-                  <SelectValue placeholder="Select Class" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="6">Grade 6</SelectItem>
-                  <SelectItem value="7">Grade 7</SelectItem>
-                  <SelectItem value="8">Grade 8</SelectItem>
-                  <SelectItem value="9">Grade 9</SelectItem>
-                  <SelectItem value="10">Grade 10</SelectItem>
-                  <SelectItem value="11">Grade 11</SelectItem>
-                  <SelectItem value="12">Grade 12</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="buyerSection" className="font-semibold text-gray-700">Section *</Label>
-            <Input 
-              id="buyerSection"
-              type="text" 
-              required 
-              value={formData.buyerSection}
-              onChange={(e) => handleInputChange("buyerSection", e.target.value)}
-              className="mt-1"
-              data-testid="input-buyer-section"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="buyerEmail" className="font-semibold text-gray-700">Email Address *</Label>
-              <Input 
-                id="buyerEmail"
-                type="email" 
-                required 
-                value={formData.buyerEmail}
-                onChange={(e) => handleInputChange("buyerEmail", e.target.value)}
-                className="mt-1"
-                data-testid="input-buyer-email"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="buyerPhone" className="font-semibold text-gray-700">Phone Number *</Label>
-              <Input 
-                id="buyerPhone"
-                type="tel" 
-                required 
-                value={formData.buyerPhone}
-                onChange={(e) => handleInputChange("buyerPhone", e.target.value)}
-                className="mt-1"
-                data-testid="input-buyer-phone"
+                placeholder="e.g., A, B, C"
+                data-testid="input-buyer-section"
               />
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="buyerAddress" className="font-semibold text-gray-700">Address *</Label>
-            <Input 
-              id="buyerAddress"
-              type="text" 
-              required 
-              value={formData.buyerAddress}
-              onChange={(e) => handleInputChange("buyerAddress", e.target.value)}
-              className="mt-1"
-              data-testid="input-buyer-address"
-            />
+          {/* Contact Information */}
+          <div className="bg-white border rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Contact Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="buyerEmail" className="font-semibold text-gray-700">Email Address *</Label>
+                <Input 
+                  id="buyerEmail"
+                  type="email" 
+                  required 
+                  value={formData.buyerEmail}
+                  onChange={(e) => handleInputChange("buyerEmail", e.target.value)}
+                  className="mt-1"
+                  placeholder="your.email@school.edu"
+                  data-testid="input-buyer-email"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="buyerPhone" className="font-semibold text-gray-700">Phone Number *</Label>
+                <Input 
+                  id="buyerPhone"
+                  type="tel" 
+                  required 
+                  value={formData.buyerPhone}
+                  onChange={(e) => handleInputChange("buyerPhone", e.target.value)}
+                  className="mt-1"
+                  placeholder="Your contact number"
+                  data-testid="input-buyer-phone"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="buyerCity" className="font-semibold text-gray-700">City *</Label>
+          {/* Pickup Arrangements */}
+          <div className="bg-white border rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Pickup Arrangements</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="pickupLocation" className="font-semibold text-gray-700">Pickup Location *</Label>
+                <Select 
+                  value={formData.pickupLocation} 
+                  onValueChange={(value) => handleInputChange("pickupLocation", value)}
+                  required
+                >
+                  <SelectTrigger className="mt-1" data-testid="select-pickup-location">
+                    <SelectValue placeholder="Choose pickup location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="School Main Gate">School Main Gate</SelectItem>
+                    <SelectItem value="Library">Library</SelectItem>
+                    <SelectItem value="Cafeteria">Cafeteria</SelectItem>
+                    <SelectItem value="Sports Ground">Sports Ground</SelectItem>
+                    <SelectItem value="Parking Area">Parking Area</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="pickupTime" className="font-semibold text-gray-700">Preferred Pickup Time *</Label>
+                <Select 
+                  value={formData.pickupTime} 
+                  onValueChange={(value) => handleInputChange("pickupTime", value)}
+                  required
+                >
+                  <SelectTrigger className="mt-1" data-testid="select-pickup-time">
+                    <SelectValue placeholder="Choose time slot" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Before School (7:30-8:00 AM)">Before School (7:30-8:00 AM)</SelectItem>
+                    <SelectItem value="Break Time (10:30-11:00 AM)">Break Time (10:30-11:00 AM)</SelectItem>
+                    <SelectItem value="Lunch Break (12:30-1:30 PM)">Lunch Break (12:30-1:30 PM)</SelectItem>
+                    <SelectItem value="After School (3:30-4:00 PM)">After School (3:30-4:00 PM)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <Label htmlFor="additionalNotes" className="font-semibold text-gray-700">Additional Notes</Label>
               <Input 
-                id="buyerCity"
+                id="additionalNotes"
                 type="text" 
-                required 
-                value={formData.buyerCity}
-                onChange={(e) => handleInputChange("buyerCity", e.target.value)}
+                value={formData.additionalNotes}
+                onChange={(e) => handleInputChange("additionalNotes", e.target.value)}
                 className="mt-1"
-                data-testid="input-buyer-city"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="buyerPincode" className="font-semibold text-gray-700">Pincode *</Label>
-              <Input 
-                id="buyerPincode"
-                type="text" 
-                required 
-                value={formData.buyerPincode}
-                onChange={(e) => handleInputChange("buyerPincode", e.target.value)}
-                className="mt-1"
-                data-testid="input-buyer-pincode"
+                placeholder="Any special instructions or notes (optional)"
+                data-testid="input-additional-notes"
               />
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="deliveryInstructions" className="font-semibold text-gray-700">Delivery Instructions</Label>
-            <Input 
-              id="deliveryInstructions"
-              type="text" 
-              value={formData.deliveryInstructions}
-              onChange={(e) => handleInputChange("deliveryInstructions", e.target.value)}
-              className="mt-1"
-              placeholder="Any special delivery instructions (optional)"
-              data-testid="input-delivery-instructions"
-            />
+          {/* Terms Agreement */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <input 
+                type="checkbox" 
+                id="terms-agreement" 
+                required 
+                className="mt-1" 
+                data-testid="checkbox-terms"
+              />
+              <div className="text-sm">
+                <label htmlFor="terms-agreement" className="text-gray-700">
+                  <strong>I agree to the terms:</strong> I understand this is a cash-on-delivery purchase, 
+                  no returns are accepted, and I will collect the item at the agreed pickup location and time. 
+                  I confirm I am a student of this school.
+                </label>
+              </div>
+            </div>
           </div>
 
           <div className="flex space-x-4 pt-6">
@@ -304,7 +355,7 @@ export default function OrderPage() {
               disabled={orderMutation.isPending}
               data-testid="button-submit-order"
             >
-              {orderMutation.isPending ? "Processing..." : "Complete Purchase"}
+              {orderMutation.isPending ? "Processing..." : "Place Order (Cash on Pickup)"}
             </Button>
           </div>
         </form>
