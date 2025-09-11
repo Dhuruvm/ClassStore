@@ -171,9 +171,10 @@ export default function Admin() {
   // Enhanced bulk operations - moved before early return
   const bulkEmailMutation = useMutation({
     mutationFn: async (emailData: { subject: string; content: string; recipients: string }) => {
-      return apiRequest("POST", "/api/admin/bulk-email", emailData);
+      const response = await apiRequest("POST", "/api/admin/bulk-email", emailData);
+      return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { success: number; failed: number }) => {
       toast({ title: "Bulk email sent", description: `Sent to ${data.success} recipients, ${data.failed} failed` });
       setBulkEmailData({ subject: "", content: "", recipients: "" });
     },
