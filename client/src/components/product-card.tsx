@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Product } from "@shared/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 interface ProductCardProps {
   product: Product;
@@ -16,8 +17,10 @@ export default function ProductCard({ product, onPurchase }: ProductCardProps) {
     const likedProducts = JSON.parse(localStorage.getItem("likedProducts") || "[]");
     return likedProducts.includes(product.id);
   });
+  const [isPressed, setIsPressed] = useState(false);
 
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const likeMutation = useMutation({
     mutationFn: async () => {
@@ -58,10 +61,40 @@ export default function ProductCard({ product, onPurchase }: ProductCardProps) {
     });
   };
 
+  const handleCardClick = () => {
+    if (!product.isSoldOut) {
+      setLocation(`/order/${product.id}`);
+    }
+  };
+
+  const handleMouseDown = () => {
+    if (!product.isSoldOut) {
+      setIsPressed(true);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPressed(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsPressed(false);
+  };
+
   return (
     <div 
-      className={`bg-white transition-all duration-300 ${product.isSoldOut ? 'opacity-60' : 'hover:shadow-sm'}`}
+      className={`bg-white transition-all duration-200 cursor-pointer select-none ${
+        product.isSoldOut 
+          ? 'opacity-60 cursor-not-allowed' 
+          : `hover:shadow-lg hover:-translate-y-1 active:transform active:scale-[0.98] ${
+              isPressed ? 'scale-[0.98] shadow-md' : ''
+            }`
+      }`}
       data-testid={`card-product-${product.id}`}
+      onClick={handleCardClick}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Image Container - Exact Nike design matching screenshot */}
       <div className="relative bg-gray-50">
