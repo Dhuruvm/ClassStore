@@ -81,7 +81,7 @@ export default function ProductCard({ product, onPurchase }: ProductCardProps) {
         {/* Like Button */}
         <button 
           onClick={handleLike}
-          disabled={product.isSoldOut}
+          disabled={product.isSoldOut || undefined}
           className={`absolute top-4 right-4 w-8 h-8 flex items-center justify-center transition-all duration-200 ${
             isLiked 
               ? "text-red-500" 
