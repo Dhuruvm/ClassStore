@@ -479,6 +479,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/admin/products/:id/details", requireAdminAuth, upload.single("image"), async (req: Request & { file?: Express.Multer.File }, res) => {
+    try {
+      const { id } = req.params;
+      const productData = {
+        ...req.body,
+        imageUrl: req.file ? `/uploads/${req.file.filename}` : undefined,
+        class: parseInt(req.body.class),
+      };
+
+      // Remove undefined values
+      Object.keys(productData).forEach(key => {
+        if (productData[key] === undefined) {
+          delete productData[key];
+        }
+      });
+
+      await storage.updateProductDetails(id, productData);
+      res.json({ message: "Product updated successfully" });
+    } catch (error) {
+      console.error("Product update error:", error);
+      res.status(400).json({ message: "Failed to update product" });
+    }
+  });
+
   // System management routes
   app.post("/api/admin/clear-cache", requireAdminAuth, async (req, res) => {
     try {

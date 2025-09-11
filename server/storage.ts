@@ -16,6 +16,7 @@ export interface IStorage {
   getProductsByClass(classNum: number): Promise<Product[]>;
   updateProductStatus(id: string, status: { isActive?: boolean; isSoldOut?: boolean }): Promise<void>;
   deleteProduct(id: string): Promise<void>;
+  updateProductDetails(id: string, updates: Partial<Product>): Promise<void>;
 
   // Order methods
   getOrders(): Promise<(Order & { product: Product })[]>;
@@ -242,6 +243,16 @@ export class MemStorage implements IStorage {
 
   async deleteProduct(id: string): Promise<void> {
     this.products.delete(id);
+  }
+
+  async updateProductDetails(id: string, updates: Partial<Product>): Promise<void> {
+    const product = this.products.get(id);
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    const updatedProduct = { ...product, ...updates };
+    this.products.set(id, updatedProduct);
   }
 
   // Order methods

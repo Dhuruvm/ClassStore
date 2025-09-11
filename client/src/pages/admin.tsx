@@ -65,6 +65,22 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [bulkEmailData, setBulkEmailData] = useState({ subject: "", content: "", recipients: "" });
   const [systemMetrics, setSystemMetrics] = useState({ cpuUsage: 0, memoryUsage: 0, activeConnections: 0 });
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [showEditProductModal, setShowEditProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    class: 6,
+    section: "",
+    category: "Textbook",
+    condition: "Good",
+    sellerName: "",
+    sellerPhone: "",
+  });
+  const [productImageFile, setProductImageFile] = useState<File | null>(null);
+  const [productImagePreview, setProductImagePreview] = useState<string>("");
 
   // Check authentication status on mount
   useEffect(() => {
@@ -102,7 +118,7 @@ export default function Admin() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
-      return apiRequest("POST", "/api/admin/login", credentials);
+      return apiRequest("POST", "/api/admin/login", { body: credentials });
     },
     onSuccess: () => {
       setAuthState("authenticated");
@@ -181,7 +197,7 @@ export default function Admin() {
   // Enhanced bulk operations - moved before early return
   const bulkEmailMutation = useMutation({
     mutationFn: async (emailData: { subject: string; content: string; recipients: string }) => {
-      const response = await apiRequest("POST", "/api/admin/bulk-email", emailData);
+      const response = await apiRequest("POST", "/api/admin/bulk-email", { body: emailData });
       return response.json();
     },
     onSuccess: (data: { success: number; failed: number }) => {
@@ -206,7 +222,7 @@ export default function Admin() {
   // Product management mutations
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, isActive, isSoldOut }: { id: string; isActive?: boolean; isSoldOut?: boolean }) => {
-      return apiRequest("PATCH", `/api/admin/products/${id}`, { isActive, isSoldOut });
+      return apiRequest("PATCH", `/api/admin/products/${id}`, { body: { isActive, isSoldOut } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
@@ -223,6 +239,62 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       toast({ title: "Product deleted successfully" });
+    },
+  });
+
+  const addProductMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        if (key !== "image" && value !== undefined) {
+          formData.append(key, value.toString());
+        }
+      });
+      if (data.image) {
+        formData.append("image", data.image);
+      }
+      return await apiRequest("POST", "/api/sellers", {
+        body: formData,
+        isFormData: true,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Product added successfully" });
+      setShowAddProductModal(false);
+      resetProductForm();
+    },
+    onError: () => {
+      toast({ title: "Failed to add product", variant: "destructive" });
+    },
+  });
+
+  const editProductMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        if (key !== "image" && value !== undefined) {
+          formData.append(key, value.toString());
+        }
+      });
+      if (data.image) {
+        formData.append("image", data.image);
+      }
+      return await apiRequest("PATCH", `/api/admin/products/${id}/details`, {
+        body: formData,
+        isFormData: true,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Product updated successfully" });
+      setShowEditProductModal(false);
+      resetProductForm();
+    },
+    onError: () => {
+      toast({ title: "Failed to update product", variant: "destructive" });
     },
   });
 
@@ -267,6 +339,70 @@ export default function Admin() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     loginMutation.mutate(loginData);
+  };
+
+  const resetProductForm = () => {
+    setProductForm({
+      name: "",
+      description: "",
+      price: "",
+      class: 6,
+      section: "",
+      category: "Textbook",
+      condition: "Good",
+      sellerName: "",
+      sellerPhone: "",
+    });
+    setProductImageFile(null);
+    setProductImagePreview("");
+    setEditingProduct(null);
+  };
+
+  const handleProductImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setProductImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProductImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddProduct = () => {
+    setShowAddProductModal(true);
+    resetProductForm();
+  };
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name,
+      description: product.description || "",
+      price: product.price,
+      class: product.class,
+      section: product.section,
+      category: product.category,
+      condition: product.condition,
+      sellerName: product.sellerName,
+      sellerPhone: product.sellerPhone,
+    });
+    setProductImagePreview(product.imageUrl || "");
+    setShowEditProductModal(true);
+  };
+
+  const submitProductForm = () => {
+    const formData = {
+      ...productForm,
+      image: productImageFile,
+    };
+
+    if (editingProduct) {
+      editProductMutation.mutate({ id: editingProduct.id, data: formData });
+    } else {
+      addProductMutation.mutate(formData);
+    }
   };
 
   const downloadInvoice = (orderId: string) => {
@@ -865,6 +1001,15 @@ export default function Admin() {
                     <span>Product Management</span>
                   </span>
                   <div className="flex items-center space-x-2">
+                    <Button 
+                      onClick={handleAddProduct}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      size="sm"
+                      data-testid="button-add-product"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Product
+                    </Button>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                       <Input placeholder="Search products..." className="pl-10 w-64" />
@@ -965,6 +1110,15 @@ export default function Admin() {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                onClick={() => handleEditProduct(product)}
+                                data-testid={`button-edit-product-${product.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 onClick={() => updateProductMutation.mutate({ 
                                   id: product.id, 
                                   isActive: !product.isActive 
@@ -1022,6 +1176,382 @@ export default function Admin() {
 
         </Tabs>
       </div>
+
+      {/* Add Product Modal */}
+      <Dialog open={showAddProductModal} onOpenChange={setShowAddProductModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Add New Product</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Image Upload */}
+            <div className="space-y-4">
+              <Label className="text-lg font-semibold">Product Image</Label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                {productImagePreview ? (
+                  <div className="relative">
+                    <img
+                      src={productImagePreview}
+                      alt="Preview"
+                      className="max-h-48 mx-auto rounded-lg"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setProductImageFile(null);
+                        setProductImagePreview("");
+                      }}
+                      className="mt-4"
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <p className="text-lg font-medium mb-4">Upload Product Image</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProductImageChange}
+                      className="hidden"
+                      id="product-image-upload"
+                    />
+                    <label htmlFor="product-image-upload">
+                      <Button type="button" variant="outline" asChild>
+                        <span>Choose Image</span>
+                      </Button>
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Product Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="add-name">Product Name *</Label>
+                <Input
+                  id="add-name"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., NCERT Math Textbook"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="add-price">Price (₹) *</Label>
+                <Input
+                  id="add-price"
+                  value={productForm.price}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, price: e.target.value }))}
+                  placeholder="299.00"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="add-category">Category *</Label>
+                <Select value={productForm.category} onValueChange={(value) => setProductForm(prev => ({ ...prev, category: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Textbook">Textbook</SelectItem>
+                    <SelectItem value="Notebook">Notebook</SelectItem>
+                    <SelectItem value="Stationery">Stationery</SelectItem>
+                    <SelectItem value="Calculator">Calculator</SelectItem>
+                    <SelectItem value="Art Supplies">Art Supplies</SelectItem>
+                    <SelectItem value="Sports Equipment">Sports Equipment</SelectItem>
+                    <SelectItem value="Electronics">Electronics</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="add-condition">Condition *</Label>
+                <Select value={productForm.condition} onValueChange={(value) => setProductForm(prev => ({ ...prev, condition: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="New">New</SelectItem>
+                    <SelectItem value="Like New">Like New</SelectItem>
+                    <SelectItem value="Good">Good</SelectItem>
+                    <SelectItem value="Fair">Fair</SelectItem>
+                    <SelectItem value="Poor">Poor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="add-class">Grade/Class *</Label>
+                <Select value={productForm.class.toString()} onValueChange={(value) => setProductForm(prev => ({ ...prev, class: parseInt(value) }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[6, 7, 8, 9, 10, 11, 12].map((grade) => (
+                      <SelectItem key={grade} value={grade.toString()}>
+                        Grade {grade}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="add-section">Section *</Label>
+                <Input
+                  id="add-section"
+                  value={productForm.section}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, section: e.target.value }))}
+                  placeholder="e.g., A, B, C"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="add-seller-name">Seller Name *</Label>
+                <Input
+                  id="add-seller-name"
+                  value={productForm.sellerName}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, sellerName: e.target.value }))}
+                  placeholder="Full name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="add-seller-phone">Seller Phone *</Label>
+                <Input
+                  id="add-seller-phone"
+                  value={productForm.sellerPhone}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, sellerPhone: e.target.value }))}
+                  placeholder="9876543210"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="add-description">Description</Label>
+              <Textarea
+                id="add-description"
+                value={productForm.description}
+                onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the product condition, features, etc..."
+                rows={4}
+              />
+            </div>
+
+            <div className="flex space-x-4">
+              <Button
+                onClick={submitProductForm}
+                disabled={addProductMutation.isPending}
+                className="flex-1"
+              >
+                {addProductMutation.isPending ? "Adding..." : "Add Product"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowAddProductModal(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Product Modal */}
+      <Dialog open={showEditProductModal} onOpenChange={setShowEditProductModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Edit Product</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Image Upload */}
+            <div className="space-y-4">
+              <Label className="text-lg font-semibold">Product Image</Label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                {productImagePreview ? (
+                  <div className="relative">
+                    <img
+                      src={productImagePreview}
+                      alt="Preview"
+                      className="max-h-48 mx-auto rounded-lg"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setProductImageFile(null);
+                        setProductImagePreview("");
+                      }}
+                      className="mt-4"
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <p className="text-lg font-medium mb-4">Upload Product Image</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProductImageChange}
+                      className="hidden"
+                      id="edit-product-image-upload"
+                    />
+                    <label htmlFor="edit-product-image-upload">
+                      <Button type="button" variant="outline" asChild>
+                        <span>Choose Image</span>
+                      </Button>
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Product Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-name">Product Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., NCERT Math Textbook"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-price">Price (₹) *</Label>
+                <Input
+                  id="edit-price"
+                  value={productForm.price}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, price: e.target.value }))}
+                  placeholder="299.00"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-category">Category *</Label>
+                <Select value={productForm.category} onValueChange={(value) => setProductForm(prev => ({ ...prev, category: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Textbook">Textbook</SelectItem>
+                    <SelectItem value="Notebook">Notebook</SelectItem>
+                    <SelectItem value="Stationery">Stationery</SelectItem>
+                    <SelectItem value="Calculator">Calculator</SelectItem>
+                    <SelectItem value="Art Supplies">Art Supplies</SelectItem>
+                    <SelectItem value="Sports Equipment">Sports Equipment</SelectItem>
+                    <SelectItem value="Electronics">Electronics</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-condition">Condition *</Label>
+                <Select value={productForm.condition} onValueChange={(value) => setProductForm(prev => ({ ...prev, condition: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="New">New</SelectItem>
+                    <SelectItem value="Like New">Like New</SelectItem>
+                    <SelectItem value="Good">Good</SelectItem>
+                    <SelectItem value="Fair">Fair</SelectItem>
+                    <SelectItem value="Poor">Poor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-class">Grade/Class *</Label>
+                <Select value={productForm.class.toString()} onValueChange={(value) => setProductForm(prev => ({ ...prev, class: parseInt(value) }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[6, 7, 8, 9, 10, 11, 12].map((grade) => (
+                      <SelectItem key={grade} value={grade.toString()}>
+                        Grade {grade}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-section">Section *</Label>
+                <Input
+                  id="edit-section"
+                  value={productForm.section}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, section: e.target.value }))}
+                  placeholder="e.g., A, B, C"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-seller-name">Seller Name *</Label>
+                <Input
+                  id="edit-seller-name"
+                  value={productForm.sellerName}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, sellerName: e.target.value }))}
+                  placeholder="Full name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-seller-phone">Seller Phone *</Label>
+                <Input
+                  id="edit-seller-phone"
+                  value={productForm.sellerPhone}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, sellerPhone: e.target.value }))}
+                  placeholder="9876543210"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={productForm.description}
+                onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the product condition, features, etc..."
+                rows={4}
+              />
+            </div>
+
+            <div className="flex space-x-4">
+              <Button
+                onClick={submitProductForm}
+                disabled={editProductMutation.isPending}
+                className="flex-1"
+              >
+                {editProductMutation.isPending ? "Updating..." : "Update Product"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowEditProductModal(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
