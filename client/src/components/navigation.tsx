@@ -37,7 +37,7 @@ export default function Navigation() {
             <div className="hidden lg:flex space-x-8">
               {navItems.map((item) => (
                 <Link key={item} href={item === "New" ? "/" : `/${item.toLowerCase()}`}>
-                  <span className="text-gray-800 font-medium hover:text-orange-500 transition-all duration-300 cursor-pointer uppercase tracking-wide text-sm relative group">
+                  <span className="text-gray-800 font-medium hover:text-orange-500 transition-all duration-300 cursor-pointer uppercase tracking-wide text-sm relative group" data-testid={`link-nav-${item.toLowerCase()}`}>
                     {item}
                     <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-orange-500 group-hover:w-full transition-all duration-300"></span>
                   </span>
@@ -140,8 +140,8 @@ export default function Navigation() {
 
     {/* Mobile Menu Overlay */}
     {isMobileMenuOpen && (
-      <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setIsMobileMenuOpen(false)}>
-        <div className="fixed top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-lg" onClick={(e) => e.stopPropagation()}>
+      <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} data-testid="overlay-mobile-menu">
+        <div className="fixed top-16 bottom-0 left-0 right-0 bg-white border-b border-gray-200 shadow-lg max-h-[calc(100vh-4rem)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           {/* Mobile Navigation */}
           <div className="px-4 py-4 space-y-4">
             {navItems.map((item) => (
@@ -149,6 +149,7 @@ export default function Navigation() {
                 <div 
                   className="block py-3 px-4 text-gray-800 font-medium hover:text-orange-500 hover:bg-gray-50 rounded-lg transition-all duration-200"
                   onClick={() => setIsMobileMenuOpen(false)}
+                  data-testid={`link-mobile-nav-${item.toLowerCase()}`}
                 >
                   {item}
                 </div>
@@ -199,7 +200,7 @@ export default function Navigation() {
                   </button>
                 </Link>
                 
-                <button className="relative flex flex-col items-center p-3" data-testid="button-mobile-favorites">
+                <button className="relative flex flex-col items-center p-3" data-testid="button-mobile-favorites" onClick={() => setIsMobileMenuOpen(false)}>
                   <Heart className="h-6 w-6 text-gray-600" />
                   <span className="text-xs text-gray-600 mt-1">Favorites</span>
                   {likedCount > 0 && (
@@ -209,7 +210,7 @@ export default function Navigation() {
                   )}
                 </button>
                 
-                <button className="flex flex-col items-center p-3" data-testid="button-mobile-profile">
+                <button className="flex flex-col items-center p-3" data-testid="button-mobile-profile" onClick={() => setIsMobileMenuOpen(false)}>
                   <UserCircle className="h-6 w-6 text-gray-600" />
                   <span className="text-xs text-gray-600 mt-1">Profile</span>
                 </button>
