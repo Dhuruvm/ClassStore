@@ -333,7 +333,15 @@ export default function OrderPage() {
                 <label htmlFor="terms-agreement" className="text-gray-700">
                   <strong>I agree to the terms:</strong> I understand this is a cash-on-delivery purchase, 
                   no returns are accepted, and I will collect the item at the agreed pickup location and time. 
-                  I confirm I am a student of this school.
+                  I confirm I am a student of this school. 
+                  <button 
+                    type="button"
+                    onClick={() => setLocation("/terms")}
+                    className="text-blue-600 hover:text-blue-800 underline ml-1"
+                    data-testid="link-terms"
+                  >
+                    Read full Terms & Conditions
+                  </button>
                 </label>
               </div>
             </div>

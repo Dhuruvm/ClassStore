@@ -6,16 +6,13 @@ import ProductCard from "@/components/product-card";
 import PurchaseModal from "@/components/purchase-modal";
 import SuccessModal from "@/components/success-modal";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Product } from "@shared/schema";
-import { Grid, List } from "lucide-react";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["/api/products"],
@@ -166,7 +163,7 @@ export default function Home() {
               <ul className="space-y-3 text-sm text-gray-300">
                 <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Support</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms</a></li>
+                <li><button onClick={() => setLocation("/terms")} className="hover:text-white transition-colors text-left">Terms & Conditions</button></li>
                 <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
               </ul>
             </div>

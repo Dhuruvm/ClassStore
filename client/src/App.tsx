@@ -7,6 +7,7 @@ import Home from "@/pages/home";
 import Sell from "@/pages/sell";
 import Admin from "@/pages/admin";
 import OrderPage from "@/pages/order";
+import TermsPage from "@/pages/terms";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/sell" component={Sell} />
       <Route path="/order/:productId" component={OrderPage} />
+      <Route path="/terms" component={TermsPage} />
       <Route path="/admin/z3XJbf0x0vXsCxnUZnscBRsnE" component={Admin} />
       <Route component={NotFound} />
     </Switch>
