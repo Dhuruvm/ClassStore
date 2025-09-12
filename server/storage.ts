@@ -1,5 +1,8 @@
-import { type User, type InsertUser, type Product, type InsertProduct, type Order, type InsertOrder, type Admin, type InsertAdmin } from "@shared/schema";
+import { type User, type InsertUser, type Product, type InsertProduct, type Order, type InsertOrder, type Admin, type InsertAdmin, users, products, orders, admins } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -459,4 +462,402 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database connection
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is required");
+}
+
+const connectionString = process.env.DATABASE_URL;
+const client = postgres(connectionString);
+const db = drizzle(client);
+
+// PostgreSQL Storage Implementation
+export class DbStorage implements IStorage {
+  private db = db;
+  private seeded = false;
+
+  constructor() {
+    this.initializeData();
+  }
+
+  private async initializeData() {
+    if (this.seeded) return;
+    
+    try {
+      // Check if we have any products, if not, seed the database
+      const existingProducts = await this.db.select().from(products).limit(1);
+      if (existingProducts.length === 0) {
+        await this.seedData();
+      }
+      this.seeded = true;
+    } catch (error) {
+      console.error("Failed to initialize data:", error);
+    }
+  }
+
+  private async seedData() {
+    console.log("🌱 Seeding database with initial data...");
+    
+    // Create admin user only in development
+    const adminId = randomUUID();
+    
+    // Only seed admin in development environment
+    if (process.env.NODE_ENV === "development") {
+      console.log("⚠️  Creating default admin for development (username: admin, password: password)");
+      console.log("⚠️  CHANGE THESE CREDENTIALS IMMEDIATELY IN PRODUCTION!");
+      
+      await this.db.insert(admins).values({
+        id: adminId,
+        username: "admin",
+        password: "$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // password
+        totpSecret: null,
+        isSetup: false,
+      });
+    } else {
+      console.log("⚠️  Production mode: No default admin created. Create admin user manually.");
+    }
+
+    // Create sample products
+    const sampleProducts = [
+      {
+        id: randomUUID(),
+        name: "Advanced Mathematics Textbook",
+        description: "Grade 10 mathematics textbook in excellent condition",
+        price: "45.00",
+        class: 10,
+        section: "A",
+        imageUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
+        sellerName: "Sarah Wilson",
+        sellerPhone: "+1234567890",
+        sellerEmail: "sarah.wilson@school.edu",
+        sellerId: "seller_001",
+        likes: 15,
+        isActive: true,
+        isSoldOut: false,
+        approvalStatus: "approved" as const,
+        approvedAt: new Date(),
+        approvedBy: adminId,
+        rejectionReason: null,
+        category: "Textbooks",
+        condition: "Excellent",
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Complete Stationery Set",
+        description: "Brand new stationery set with pens, pencils, ruler, and notebooks",
+        price: "25.00",
+        class: 8,
+        section: "B",
+        imageUrl: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
+        sellerName: "Mike Johnson",
+        sellerPhone: "+1234567891",
+        sellerEmail: "mike.johnson@school.edu",
+        sellerId: "seller_002",
+        likes: 8,
+        isActive: true,
+        isSoldOut: false,
+        approvalStatus: "approved" as const,
+        approvedAt: new Date(),
+        approvedBy: adminId,
+        rejectionReason: null,
+        category: "Stationery",
+        condition: "New",
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Scientific Calculator TI-84",
+        description: "Barely used TI-84 calculator perfect for advanced mathematics",
+        price: "120.00",
+        class: 11,
+        section: "C",
+        imageUrl: "https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
+        sellerName: "Emma Davis",
+        sellerPhone: "+1234567892",
+        sellerEmail: "emma.davis@school.edu",
+        sellerId: "seller_003",
+        likes: 23,
+        isActive: true,
+        isSoldOut: false,
+        approvalStatus: "approved" as const,
+        approvedAt: new Date(),
+        approvedBy: adminId,
+        rejectionReason: null,
+        category: "Electronics",
+        condition: "Like New",
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Chemistry Lab Kit",
+        description: "Complete chemistry lab equipment set",
+        price: "85.00",
+        class: 12,
+        section: "A",
+        imageUrl: "https://images.unsplash.com/photo-1582719471384-894fbb16e074?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=250",
+        sellerName: "Alex Chen",
+        sellerPhone: "+1234567893",
+        sellerEmail: "alex.chen@school.edu",
+        sellerId: "seller_004",
+        likes: 12,
+        isActive: true,
+        isSoldOut: false,
+        approvalStatus: "approved" as const,
+        approvedAt: new Date(),
+        approvedBy: adminId,
+        rejectionReason: null,
+        category: "Lab Equipment",
+        condition: "Good",
+        createdAt: new Date(),
+      }
+    ];
+
+    for (const product of sampleProducts) {
+      await this.db.insert(products).values(product);
+    }
+
+    console.log("✓ Database seeded successfully");
+  }
+
+  // User methods
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const user: User = { ...insertUser, id };
+    await this.db.insert(users).values(user);
+    return user;
+  }
+
+  // Product methods
+  async getProducts(): Promise<Product[]> {
+    return await this.db.select().from(products).where(eq(products.isActive, true));
+  }
+
+  async getAllProducts(): Promise<Product[]> {
+    return await this.db.select().from(products);
+  }
+
+  async getProduct(id: string): Promise<Product | undefined> {
+    const result = await this.db.select().from(products).where(eq(products.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+    const id = randomUUID();
+    const product: Product = {
+      ...insertProduct,
+      id,
+      description: insertProduct.description || null,
+      imageUrl: insertProduct.imageUrl || null,
+      sellerEmail: insertProduct.sellerEmail || null,
+      sellerId: insertProduct.sellerId || null,
+      category: insertProduct.category || "General",
+      condition: insertProduct.condition || "Good",
+      likes: 0,
+      isActive: true,
+      isSoldOut: false,
+      approvalStatus: "pending",
+      approvedAt: null,
+      approvedBy: null,
+      rejectionReason: null,
+      createdAt: new Date(),
+    };
+    await this.db.insert(products).values(product);
+    return product;
+  }
+
+  async updateProductLikes(id: string, likes: number): Promise<void> {
+    await this.db.update(products).set({ likes }).where(eq(products.id, id));
+  }
+
+  async getApprovedProducts(): Promise<Product[]> {
+    return await this.db.select().from(products).where(eq(products.approvalStatus, "approved"));
+  }
+
+  async getPendingProducts(): Promise<Product[]> {
+    return await this.db.select().from(products).where(eq(products.approvalStatus, "pending"));
+  }
+
+  async getProductsByClass(classNum: number): Promise<Product[]> {
+    return await this.db.select().from(products).where(and(eq(products.class, classNum), eq(products.isActive, true)));
+  }
+
+  async getProductsBySeller(sellerId: string): Promise<Product[]> {
+    return await this.db.select().from(products).where(eq(products.sellerId, sellerId));
+  }
+
+  async updateProductStatus(id: string, status: { isActive?: boolean; isSoldOut?: boolean }): Promise<void> {
+    await this.db.update(products).set(status).where(eq(products.id, id));
+  }
+
+  async updateProductApproval(id: string, status: "approved" | "rejected", adminId: string, reason?: string): Promise<void> {
+    const updateData: any = {
+      approvalStatus: status,
+      approvedBy: adminId,
+    };
+    
+    if (status === "approved") {
+      updateData.approvedAt = new Date();
+      updateData.rejectionReason = null;
+    } else {
+      updateData.approvedAt = null;
+      updateData.rejectionReason = reason || null;
+    }
+    
+    await this.db.update(products).set(updateData).where(eq(products.id, id));
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    await this.db.delete(products).where(eq(products.id, id));
+  }
+
+  async updateProductDetails(id: string, updates: Partial<Product>): Promise<void> {
+    await this.db.update(products).set(updates).where(eq(products.id, id));
+  }
+
+  // Order methods
+  async getOrders(): Promise<(Order & { product: Product })[]> {
+    const result = await this.db
+      .select()
+      .from(orders)
+      .leftJoin(products, eq(orders.productId, products.id))
+      .orderBy(desc(orders.createdAt));
+    
+    return result.map(row => ({
+      ...row.orders,
+      product: row.products!,
+    }));
+  }
+
+  async getOrder(id: string): Promise<(Order & { product: Product }) | undefined> {
+    const result = await this.db
+      .select()
+      .from(orders)
+      .leftJoin(products, eq(orders.productId, products.id))
+      .where(eq(orders.id, id))
+      .limit(1);
+    
+    if (result.length === 0) return undefined;
+    
+    return {
+      ...result[0].orders,
+      product: result[0].products!,
+    };
+  }
+
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    const id = randomUUID();
+    const order: Order = {
+      ...insertOrder,
+      amount: typeof insertOrder.amount === 'number' ? insertOrder.amount.toString() : insertOrder.amount,
+      buyerId: insertOrder.buyerId || null,
+      additionalNotes: insertOrder.additionalNotes || null,
+      id,
+      status: "pending",
+      cancelledBy: null,
+      cancellationReason: null,
+      deliveryConfirmedAt: null,
+      invoiceGenerated: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await this.db.insert(orders).values(order);
+    return order;
+  }
+
+  async getOrdersByBuyer(buyerId: string): Promise<(Order & { product: Product })[]> {
+    const result = await this.db
+      .select()
+      .from(orders)
+      .leftJoin(products, eq(orders.productId, products.id))
+      .where(eq(orders.buyerId, buyerId))
+      .orderBy(desc(orders.createdAt));
+    
+    return result.map(row => ({
+      ...row.orders,
+      product: row.products!,
+    }));
+  }
+
+  async updateOrderStatus(id: string, status: "pending" | "confirmed" | "delivered" | "cancelled", cancelledBy?: string, reason?: string): Promise<void> {
+    const updateData: any = {
+      status,
+      updatedAt: new Date(),
+    };
+    
+    if (status === "cancelled" && cancelledBy && reason) {
+      updateData.cancelledBy = cancelledBy;
+      updateData.cancellationReason = reason;
+    }
+    
+    await this.db.update(orders).set(updateData).where(eq(orders.id, id));
+  }
+
+  async markOrderDelivered(id: string): Promise<void> {
+    await this.db.update(orders).set({
+      status: "delivered",
+      deliveryConfirmedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, id));
+  }
+
+  async cancelOrder(id: string, cancelledBy: string, reason: string): Promise<void> {
+    await this.db.update(orders).set({
+      status: "cancelled",
+      cancelledBy,
+      cancellationReason: reason,
+      updatedAt: new Date(),
+    }).where(eq(orders.id, id));
+  }
+
+  async markInvoiceGenerated(id: string): Promise<void> {
+    await this.db.update(orders).set({
+      invoiceGenerated: true,
+      updatedAt: new Date(),
+    }).where(eq(orders.id, id));
+  }
+
+  // Admin methods
+  async getAdmin(id: string): Promise<Admin | undefined> {
+    const result = await this.db.select().from(admins).where(eq(admins.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAdminByUsername(username: string): Promise<Admin | undefined> {
+    const result = await this.db.select().from(admins).where(eq(admins.username, username)).limit(1);
+    return result[0];
+  }
+
+  async createAdmin(insertAdmin: InsertAdmin): Promise<Admin> {
+    const id = randomUUID();
+    const admin: Admin = {
+      ...insertAdmin,
+      id,
+      totpSecret: null,
+      isSetup: false,
+    };
+    await this.db.insert(admins).values(admin);
+    return admin;
+  }
+
+  async updateAdminTotpSecret(id: string, secret: string): Promise<void> {
+    await this.db.update(admins).set({ totpSecret: secret }).where(eq(admins.id, id));
+  }
+
+  async setAdminSetup(id: string): Promise<void> {
+    await this.db.update(admins).set({ isSetup: true }).where(eq(admins.id, id));
+  }
+}
+
+// Use database storage instead of memory storage
+export const storage = new DbStorage();
