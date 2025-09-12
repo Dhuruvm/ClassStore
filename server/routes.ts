@@ -1,6 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import cors from "cors";
 import { storage } from "./storage";
 import { insertProductSchema, insertOrderSchema } from "@shared/schema";
@@ -11,6 +12,7 @@ import { RecaptchaService } from "./services/recaptcha";
 import { upload } from "./middleware/upload";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+// Modern CSRF protection via Origin/Referer validation
 import path from "path";
 import fs from "fs";
 
@@ -23,7 +25,7 @@ declare module "express-session" {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Security middleware
+  // Security middleware with HSTS for production
   app.use(helmet({
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
@@ -35,6 +37,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         frameSrc: ["'self'", "https://www.google.com"],
       },
     },
+    hsts: process.env.NODE_ENV === "production" ? {
+      maxAge: 15552000, // 180 days
+      includeSubDomains: true,
+      preload: true
+    } : false,
   }));
 
   // Rate limiting for API endpoints
@@ -59,9 +66,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     message: { message: "Too many login attempts, please try again later." },
   });
 
-  app.use("/api", apiLimiter);
+  // Enforce strong production requirements
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.SESSION_SECRET) {
+      throw new Error("SESSION_SECRET environment variable is required in production");
+    }
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL environment variable is required in production");
+    }
+  }
 
-  // Configure CORS
+  // Strict origin validation helper
+  const isValidOrigin = (origin: string, allowedOrigins: string[]): boolean => {
+    try {
+      const url = new URL(origin);
+      const originBase = `${url.protocol}//${url.host}`;
+      return allowedOrigins.includes(originBase);
+    } catch {
+      return false;
+    }
+  };
+
+  // Secure CSRF protection middleware
+  const csrfProtection = (req: any, res: any, next: any) => {
+    const origin = req.get('Origin') || req.get('Referer');
+    const allowedOrigins = process.env.NODE_ENV === "production" 
+      ? (process.env.ALLOWED_ORIGINS?.split(",") || ["https://classstore.com"])
+      : ["http://localhost:5000", "http://127.0.0.1:5000"];
+    
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+      if (!origin || !isValidOrigin(origin, allowedOrigins)) {
+        return res.status(403).json({ message: "CSRF protection: Invalid origin" });
+      }
+    }
+    next();
+  };
+
+  // Configure CORS first for proper preflight handling
   app.use(cors({
     origin: process.env.NODE_ENV === "production" 
       ? (process.env.ALLOWED_ORIGINS?.split(",") || ["https://classstore.com"])
@@ -69,17 +110,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     credentials: true,
   }));
 
-  // Configure sessions
+  // Configure PostgreSQL session store for production reliability
+  const PgSession = connectPgSimple(session);
+  const sessionStore = process.env.DATABASE_URL ? new PgSession({
+    conString: process.env.DATABASE_URL,
+    tableName: 'user_sessions',
+    createTableIfMissing: true,
+  }) : undefined;
+
+  // Configure sessions with security hardening and production store
   app.use(session({
+    store: sessionStore, // Use PostgreSQL store in production
     secret: process.env.SESSION_SECRET || "your-super-secret-session-key-change-in-production",
     resave: false,
     saveUninitialized: false,
+    rolling: true, // Extend session on activity
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
   }));
+
+  app.use("/api", apiLimiter);
+  
+  // Apply CSRF protection to all non-GET API routes (after declaration)
+  app.use("/api", (req: any, res: any, next: any) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+      return csrfProtection(req, res, next);
+    }
+    next();
+  });
 
   // Serve uploaded files securely using express.static
   const uploadsPath = path.join(process.cwd(), "server", "uploads");
@@ -149,9 +211,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order routes
-  app.post("/api/orders", async (req, res) => {
+  app.post("/api/orders", orderLimiter, async (req, res) => {
     try {
-      console.log("Order request body:", JSON.stringify(req.body, null, 2));
+      // PII logging removed for production security
       const validatedData = insertOrderSchema.parse(req.body);
 
       // Verify reCAPTCHA (security requirement)
@@ -159,9 +221,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "reCAPTCHA verification required" });
       }
 
-      // Server-side reCAPTCHA verification with Google
+      // Enforce reCAPTCHA verification in production
       const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
-      if (recaptchaSecret && recaptchaSecret !== "dummy-secret") {
+      if (!recaptchaSecret) {
+        if (process.env.NODE_ENV === "production") {
+          console.error("RECAPTCHA_SECRET_KEY is required in production");
+          return res.status(500).json({ message: "Server configuration error" });
+        } else {
+          console.warn("reCAPTCHA verification skipped (development mode)");
+        }
+      } else if (recaptchaSecret !== "dummy-secret") {
         try {
           const axios = require("axios");
           const recaptchaResponse = await axios.post(
@@ -323,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin authentication routes
-  app.post("/api/admin/login", async (req, res) => {
+  app.post("/api/admin/login", authLimiter, async (req, res) => {
     try {
       const { username, password } = req.body;
 
