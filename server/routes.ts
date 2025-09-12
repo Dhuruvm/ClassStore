@@ -9,6 +9,8 @@ import { emailService } from "./services/email";
 import { PDFService } from "./services/pdf";
 import { RecaptchaService } from "./services/recaptcha";
 import { upload } from "./middleware/upload";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import path from "path";
 import fs from "fs";
 
@@ -21,6 +23,44 @@ declare module "express-session" {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Security middleware
+  app.use(helmet({
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "https://www.google.com", "https://www.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        frameSrc: ["'self'", "https://www.google.com"],
+      },
+    },
+  }));
+
+  // Rate limiting for API endpoints
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: { message: "Too many API requests from this IP, please try again later." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Stricter rate limiting for order creation and auth
+  const orderLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit each IP to 10 orders per 15 minutes
+    message: { message: "Too many order attempts, please try again later." },
+  });
+
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // limit each IP to 5 login attempts per 15 minutes
+    message: { message: "Too many login attempts, please try again later." },
+  });
+
+  app.use("/api", apiLimiter);
+
   // Configure CORS
   app.use(cors({
     origin: process.env.NODE_ENV === "production" 
@@ -117,6 +157,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify reCAPTCHA (security requirement)
       if (!validatedData.recaptchaToken || validatedData.recaptchaToken === "dummy-token") {
         return res.status(400).json({ message: "reCAPTCHA verification required" });
+      }
+
+      // Server-side reCAPTCHA verification with Google
+      const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+      if (recaptchaSecret && recaptchaSecret !== "dummy-secret") {
+        try {
+          const axios = require("axios");
+          const recaptchaResponse = await axios.post(
+            `https://www.google.com/recaptcha/api/siteverify?secret=${recaptchaSecret}&response=${validatedData.recaptchaToken}`
+          );
+          
+          if (!recaptchaResponse.data.success) {
+            return res.status(400).json({ 
+              message: "reCAPTCHA verification failed",
+              errors: recaptchaResponse.data["error-codes"] || []
+            });
+          }
+        } catch (error) {
+          console.error("reCAPTCHA verification error:", error);
+          return res.status(500).json({ message: "reCAPTCHA verification error" });
+        }
       }
 
       // Get product details and validate price
