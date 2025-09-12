@@ -102,7 +102,7 @@ export default function PurchaseModal({ product, isOpen, onClose, onSuccess }: P
                   Grade {product.class} - Section {product.section}
                 </p>
                 <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent" data-testid="text-product-price">
-                  ${product.price}
+                  ₹{product.price}
                 </p>
               </div>
             </div>

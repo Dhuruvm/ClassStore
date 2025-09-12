@@ -63,9 +63,6 @@ interface OrderWithProduct {
 }
 
 export default function Admin() {
-  const params = useParams();
-  const section = params.section || "login";
-  
   const [loginData, setLoginData] = useState({ username: "", password: "" });
   const [authState, setAuthState] = useState<"login" | "authenticated">("login");
   

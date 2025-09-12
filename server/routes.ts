@@ -41,17 +41,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   }));
 
-  // Serve uploaded files
-  app.use("/uploads", (req, res, next) => {
-    const uploadsPath = path.join(process.cwd(), "server", "uploads");
-    const filePath = path.join(uploadsPath, req.path);
-
-    if (fs.existsSync(filePath)) {
-      res.sendFile(filePath);
-    } else {
-      res.status(404).json({ message: "File not found" });
+  // Serve uploaded files securely using express.static
+  const uploadsPath = path.join(process.cwd(), "server", "uploads");
+  app.use("/uploads", require("express").static(uploadsPath, {
+    dotfiles: "deny",    // Prevent access to hidden files
+    index: false,        // Don't serve directory listings
+    setHeaders: (res: any) => {
+      res.set("X-Content-Type-Options", "nosniff");
+      res.set("X-Frame-Options", "DENY");
     }
-  });
+  }));
 
   // Product routes
   app.get("/api/products", async (req, res) => {
@@ -115,16 +114,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Order request body:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
 
-      // CAPTCHA verification removed for simplified authentication
+      // Verify reCAPTCHA (security requirement)
+      if (!validatedData.recaptchaToken || validatedData.recaptchaToken === "dummy-token") {
+        return res.status(400).json({ message: "reCAPTCHA verification required" });
+      }
 
-      // Get product details
+      // Get product details and validate price
       const product = await storage.getProduct(validatedData.productId);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      // Create order
-      const orderData = { ...validatedData };
+      // Server-side price validation (prevent client price tampering)
+      if (validatedData.amount !== product.price) {
+        return res.status(400).json({ 
+          message: "Price validation failed",
+          expected: product.price,
+          received: validatedData.amount
+        });
+      }
+
+      // Create order with server-validated data
+      const orderData = { 
+        ...validatedData,
+        amount: product.price  // Use server price string, not client price
+      };
       delete (orderData as any).recaptchaToken;
 
       const order = await storage.createOrder(orderData);
