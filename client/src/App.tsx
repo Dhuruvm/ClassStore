@@ -21,7 +21,7 @@ function Router() {
       <Route path="/order/:productId" component={OrderPage} />
       <Route path="/orders" component={OrdersPage} />
       <Route path="/terms" component={TermsPage} />
-      <Route path="/admin" component={Admin} />
+      <Route path="/admin/z3XJbf0x0vXsCxnUZnscBRsnE" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );
