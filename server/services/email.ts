@@ -367,7 +367,7 @@ export class EnhancedEmailService {
   }
 
   async sendCancellationNotification(order: any, product: any, reason: string) {
-    const adminUrl = `${process.env.SITE_URL || 'http://localhost:5000'}/admin/${process.env.ADMIN_URL_PART || 'z3XJbf0x0vXsCxnUZnscBRsnE'}`;
+    const adminUrl = `${process.env.SITE_URL || 'http://localhost:5000'}/admin`;
     
     const htmlContent = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">

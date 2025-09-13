@@ -966,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/confirm/:orderId", async (req, res) => {
     try {
       await storage.updateOrderStatus(req.params.orderId, "confirmed");
-      res.redirect(`${process.env.SITE_URL || 'http://localhost:5000'}/admin/z3XJbf0x0vXsCxnUZnscBRsnE`);
+      res.redirect(`${process.env.SITE_URL || 'http://localhost:5000'}/admin`);
     } catch (error) {
       res.status(500).send("Failed to confirm order");
     }
@@ -975,7 +975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/cancel/:orderId", async (req, res) => {
     try {
       await storage.updateOrderStatus(req.params.orderId, "cancelled");
-      res.redirect(`${process.env.SITE_URL || 'http://localhost:5000'}/admin/z3XJbf0x0vXsCxnUZnscBRsnE`);
+      res.redirect(`${process.env.SITE_URL || 'http://localhost:5000'}/admin`);
     } catch (error) {
       res.status(500).send("Failed to cancel order");
     }
