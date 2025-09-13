@@ -256,10 +256,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Server-side price validation (prevent client price tampering)
-      if (validatedData.amount !== product.price) {
+      const productPrice = parseFloat(product.price);
+      if (validatedData.amount !== productPrice) {
         return res.status(400).json({ 
           message: "Price validation failed",
-          expected: product.price,
+          expected: productPrice,
           received: validatedData.amount
         });
       }
@@ -267,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create order with server-validated data
       const orderData = { 
         ...validatedData,
-        amount: product.price  // Use server price string, not client price
+        amount: parseFloat(product.price).toString()  // Ensure consistent decimal format
       };
 
       const order = await storage.createOrder(orderData);
