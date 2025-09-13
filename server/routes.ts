@@ -895,6 +895,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // System management routes
+  app.get("/api/admin/maintenance-mode", requireAdminAuth, async (req, res) => {
+    try {
+      const isMaintenanceMode = await storage.isMaintenanceMode();
+      res.json({ maintenanceMode: isMaintenanceMode });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get maintenance mode status" });
+    }
+  });
+
+  app.post("/api/admin/maintenance-mode", requireAdminAuth, async (req, res) => {
+    try {
+      // Validate request body
+      const { z } = require("zod");
+      const maintenanceModeSchema = z.object({
+        enabled: z.boolean()
+      });
+      
+      const validation = maintenanceModeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body", 
+          errors: validation.error.issues 
+        });
+      }
+      
+      const { enabled } = validation.data;
+      const adminId = req.session.adminId;
+      await storage.setMaintenanceMode(enabled, adminId);
+      res.json({ 
+        success: true, 
+        maintenanceMode: enabled,
+        message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'} successfully` 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to update maintenance mode" });
+    }
+  });
+
   app.post("/api/admin/clear-cache", requireAdminAuth, async (req, res) => {
     try {
       // Simulate cache clearing

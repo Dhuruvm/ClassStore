@@ -471,6 +471,34 @@ export default function Admin() {
     },
   });
 
+  // Maintenance mode queries
+  const { data: maintenanceModeData } = useQuery({
+    queryKey: ["/api/admin/maintenance-mode"],
+    enabled: authState === "authenticated"
+  });
+
+  const maintenanceModeMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return apiRequest("POST", "/api/admin/maintenance-mode", {
+        body: { enabled },
+      });
+    },
+    onSuccess: (response, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/maintenance-mode"] });
+      toast({
+        title: "Maintenance Mode Updated",
+        description: `Maintenance mode has been ${enabled ? 'enabled' : 'disabled'}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to Update Maintenance Mode",
+        description: error.message || "An error occurred while updating maintenance mode",
+      });
+    },
+  });
+
 
   const editProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
@@ -1257,6 +1285,45 @@ export default function Admin() {
 
           {/* System Tab */}
           <TabsContent value="system" className="space-y-6">
+            {/* Maintenance Mode Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span>Maintenance Mode</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Maintenance Mode</p>
+                    <p className="text-xs text-muted-foreground">
+                      When enabled, the website will show a maintenance page to regular users
+                    </p>
+                  </div>
+                  <Switch
+                    checked={maintenanceModeData?.maintenanceMode || false}
+                    onCheckedChange={(enabled) => maintenanceModeMutation.mutate(enabled)}
+                    disabled={maintenanceModeMutation.isPending}
+                    data-testid="switch-maintenance-mode"
+                  />
+                </div>
+                {maintenanceModeData?.maintenanceMode && (
+                  <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      <p className="text-sm text-orange-800 dark:text-orange-200 font-medium">
+                        Maintenance mode is active
+                      </p>
+                    </div>
+                    <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                      Regular users will see a maintenance page and cannot access the application
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
