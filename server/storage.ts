@@ -861,3 +861,6 @@ export class DbStorage implements IStorage {
 
 // Use database storage if DATABASE_URL is provided, otherwise use memory storage
 export const storage = process.env.DATABASE_URL ? new DbStorage() : new MemStorage();
+
+// Log which storage type is being used
+console.log(`📊 Storage: Using ${process.env.DATABASE_URL ? 'PostgreSQL Database' : 'In-Memory'} storage`);
