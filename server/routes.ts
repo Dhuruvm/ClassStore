@@ -130,6 +130,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   }));
 
+  // Maintenance mode middleware - blocks non-admin users when enabled
+  const maintenanceModeMiddleware = async (req: any, res: any, next: any) => {
+    try {
+      // Skip maintenance check for admin routes and login
+      if (req.path.startsWith('/api/admin') || req.path === '/api/auth/login') {
+        return next();
+      }
+
+      // Check if maintenance mode is enabled
+      const isMaintenanceMode = await storage.isMaintenanceMode();
+      
+      if (isMaintenanceMode) {
+        // Return maintenance mode response for API requests
+        if (req.path.startsWith('/api/')) {
+          return res.status(503).json({
+            message: "System is currently under maintenance. Please try again later.",
+            maintenanceMode: true
+          });
+        }
+        
+        // For non-API requests (static files, pages), allow through
+        // The frontend will handle showing maintenance UI based on API responses
+        return next();
+      }
+      
+      next();
+    } catch (error) {
+      // If maintenance mode check fails, allow through to avoid blocking the site
+      console.error('Maintenance mode check failed:', error);
+      next();
+    }
+  };
+
+  // Apply maintenance mode middleware to all routes
+  app.use(maintenanceModeMiddleware);
+
   app.use("/api", apiLimiter);
   
   // Apply CSRF protection to all non-GET API routes (after declaration)
