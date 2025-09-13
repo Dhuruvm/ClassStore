@@ -102,19 +102,10 @@ export default function Admin() {
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<OrderWithProduct | null>(null);
   const [cancellationReason, setCancellationReason] = useState("");
 
-  // Check authentication status on mount
+  // Check authentication status on mount - simplified (always authenticated)
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch("/api/admin/stats", { credentials: "include" });
-        if (response.ok) {
-          setAuthState("authenticated");
-        }
-      } catch (error) {
-        // Not authenticated, stay on login
-      }
-    };
-    checkAuth();
+    // Bypass authentication check - always authenticated
+    setAuthState("authenticated");
   }, []);
 
   // Real-time system monitoring
@@ -576,7 +567,8 @@ export default function Admin() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    loginMutation.mutate(loginData);
+    // Bypass login validation - automatically authenticate
+    setAuthState("authenticated");
   };
 
   const resetProductForm = () => {
