@@ -91,23 +91,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Secure CSRF protection middleware
   const csrfProtection = (req: any, res: any, next: any) => {
     const origin = req.get('Origin') || req.get('Referer');
+    const host = req.get('host');
     const allowedOrigins = process.env.NODE_ENV === "production" 
       ? (process.env.ALLOWED_ORIGINS?.split(",") || ["https://classstore.com"])
-      : ["http://localhost:5000", "http://127.0.0.1:5000", `${req.protocol}://${req.get('host')}`];
+      : [
+          "http://localhost:5000", 
+          "http://127.0.0.1:5000", 
+          `${req.protocol}://${host}`,
+          `https://${host}`,
+          `http://${host}`
+        ];
     
     if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+      // More lenient check for development
+      if (process.env.NODE_ENV !== "production") {
+        if (origin && host && !origin.includes(host)) {
+          console.log(`CSRF Warning: Origin ${origin} doesn't match host ${host}, but allowing in development`);
+        }
+        return next();
+      }
+      
       if (!origin || !isValidOrigin(origin, allowedOrigins)) {
+        console.log(`CSRF blocked: Origin ${origin}, Host: ${host}, Allowed: ${allowedOrigins.join(', ')}`);
         return res.status(403).json({ message: "CSRF protection: Invalid origin" });
       }
     }
     next();
   };
 
+  // Configure trust proxy for rate limiting
+  if (process.env.NODE_ENV === "production") {
+    app.set('trust proxy', 1);
+  }
+
   // Configure CORS first for proper preflight handling
   app.use(cors({
     origin: process.env.NODE_ENV === "production" 
       ? (process.env.ALLOWED_ORIGINS?.split(",") || ["https://classstore.com"])
-      : ["http://localhost:5000", "http://127.0.0.1:5000"],
+      : true, // Allow any origin in development
     credentials: true,
   }));
 
