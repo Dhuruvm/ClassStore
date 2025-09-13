@@ -105,7 +105,6 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   pickupTime: z.string().min(1),
   additionalNotes: z.string().optional(),
   amount: z.string().regex(/^\d+(\.\d{2})?$/).transform((val) => parseFloat(val)),
-  recaptchaToken: z.string().optional(),
 });
 
 export const insertAdminSchema = createInsertSchema(admins).pick({

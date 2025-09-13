@@ -46,16 +46,12 @@ export class SellerService {
       return existingData.seller;
     }
 
-    // Create new seller
-    if (!sellerData?.name || !sellerData?.phone) {
-      throw new Error('Seller name and phone are required for new seller');
-    }
-
+    // Create new seller with optional info
     const newSeller: SellerInfo = {
       id: this.generateSellerId(),
-      name: sellerData.name,
-      email: sellerData.email || '',
-      phone: sellerData.phone,
+      name: sellerData?.name || 'Anonymous',
+      email: sellerData?.email || '',
+      phone: sellerData?.phone || 'Not provided',
       createdAt: new Date().toISOString(),
     };
 

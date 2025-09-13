@@ -143,14 +143,6 @@ export default function Sell() {
   };
 
   const onSubmit = (data: InsertProduct) => {
-    if (!data.sellerName || !data.sellerPhone) {
-      toast({
-        variant: "destructive",
-        title: "MISSING INFORMATION",
-        description: "Please provide your name and phone number.",
-      });
-      return;
-    }
     sellMutation.mutate({ ...data, image: imageFile || undefined });
   };
 
@@ -451,7 +443,7 @@ export default function Sell() {
                     name="sellerName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-bold">YOUR NAME *</FormLabel>
+                        <FormLabel className="text-lg font-bold">YOUR NAME</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Full name"
@@ -470,7 +462,7 @@ export default function Sell() {
                     name="sellerPhone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-bold">PHONE NUMBER *</FormLabel>
+                        <FormLabel className="text-lg font-bold">PHONE NUMBER</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="9876543210"

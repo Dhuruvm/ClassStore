@@ -180,13 +180,7 @@ export default function PurchaseModal({ product, isOpen, onClose, onSuccess }: P
             />
           </div>
 
-          {/* reCAPTCHA Placeholder */}
-          <div className="border border-input rounded-md p-4 bg-muted/50 text-center">
-            <p className="text-sm text-muted-foreground">reCAPTCHA verification will appear here</p>
-            <div className="mt-2 text-xs text-muted-foreground">
-              (Configure REACT_APP_RECAPTCHA_KEY in environment)
-            </div>
-          </div>
+          
 
           <div className="flex space-x-4 pt-6">
             <Button 

@@ -99,14 +99,6 @@ export default function AdminAddProduct() {
   };
 
   const onSubmit = (data: InsertProduct) => {
-    if (!data.sellerName || !data.sellerPhone) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please provide seller name and phone number.",
-      });
-      return;
-    }
     addProductMutation.mutate({ ...data, image: imageFile || undefined });
   };
 
@@ -379,7 +371,7 @@ export default function AdminAddProduct() {
                       name="sellerName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Seller Name *</FormLabel>
+                          <FormLabel>Seller Name</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="Full name"
@@ -398,7 +390,7 @@ export default function AdminAddProduct() {
                       name="sellerPhone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Phone Number *</FormLabel>
+                          <FormLabel>Phone Number</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="9876543210"

@@ -249,39 +249,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // PII logging removed for production security
       const validatedData = insertOrderSchema.parse(req.body);
 
-      // Verify reCAPTCHA (security requirement)
-      if (!validatedData.recaptchaToken || validatedData.recaptchaToken === "dummy-token") {
-        return res.status(400).json({ message: "reCAPTCHA verification required" });
-      }
-
-      // Enforce reCAPTCHA verification in production
-      const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
-      if (!recaptchaSecret) {
-        if (process.env.NODE_ENV === "production") {
-          console.error("RECAPTCHA_SECRET_KEY is required in production");
-          return res.status(500).json({ message: "Server configuration error" });
-        } else {
-          console.warn("reCAPTCHA verification skipped (development mode)");
-        }
-      } else if (recaptchaSecret !== "dummy-secret") {
-        try {
-          // Using axios import from top of file
-          const recaptchaResponse = await axios.post(
-            `https://www.google.com/recaptcha/api/siteverify?secret=${recaptchaSecret}&response=${validatedData.recaptchaToken}`
-          );
-          
-          if (!recaptchaResponse.data.success) {
-            return res.status(400).json({ 
-              message: "reCAPTCHA verification failed",
-              errors: recaptchaResponse.data["error-codes"] || []
-            });
-          }
-        } catch (error) {
-          console.error("reCAPTCHA verification error:", error);
-          return res.status(500).json({ message: "reCAPTCHA verification error" });
-        }
-      }
-
       // Get product details and validate price
       const product = await storage.getProduct(validatedData.productId);
       if (!product) {
@@ -302,7 +269,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         amount: product.price  // Use server price string, not client price
       };
-      delete (orderData as any).recaptchaToken;
 
       const order = await storage.createOrder(orderData);
 
@@ -393,6 +359,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
         class: parseInt(req.body.class),
+        // Set defaults for optional seller info if not provided
+        sellerName: req.body.sellerName || "Anonymous",
+        sellerPhone: req.body.sellerPhone || "Not provided",
       };
 
       const validatedData = insertProductSchema.parse(productData);
