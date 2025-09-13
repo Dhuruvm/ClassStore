@@ -1,4 +1,4 @@
-import type { Express, Request } from "express";
+import express, { type Express, type Request } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -145,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve uploaded files securely using express.static
   const uploadsPath = path.join(process.cwd(), "server", "uploads");
-  app.use("/uploads", require("express").static(uploadsPath, {
+  app.use("/uploads", express.static(uploadsPath, {
     dotfiles: "deny",    // Prevent access to hidden files
     index: false,        // Don't serve directory listings
     setHeaders: (res: any) => {
