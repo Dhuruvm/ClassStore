@@ -7,6 +7,7 @@ import Home from "@/pages/home";
 import Sell from "@/pages/sell";
 import Dashboard from "@/pages/dashboard";
 import Admin from "@/pages/admin";
+import AdminAddProduct from "@/pages/admin-add-product";
 import OrderPage from "@/pages/order";
 import OrdersPage from "@/pages/orders";
 import TermsPage from "@/pages/terms";
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/orders" component={OrdersPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/admin" component={Admin} />
+      <Route path="/admin/add-product" component={AdminAddProduct} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { 
   LogOut, ShoppingCart, Clock, DollarSign, Package, Download, Users, 
   TrendingUp, BarChart3, Settings, Mail, Database, Activity, 
@@ -72,7 +72,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [bulkEmailData, setBulkEmailData] = useState({ subject: "", content: "", recipients: "" });
   const [systemMetrics, setSystemMetrics] = useState({ cpuUsage: 0, memoryUsage: 0, activeConnections: 0 });
-  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [, setLocation] = useLocation();
   const [showEditProductModal, setShowEditProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [productSearchTerm, setProductSearchTerm] = useState("");
@@ -471,33 +471,6 @@ export default function Admin() {
     },
   });
 
-  const addProductMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const formData = new FormData();
-      Object.entries(data).forEach(([key, value]) => {
-        if (key !== "image" && value !== undefined && value !== null) {
-          formData.append(key, value.toString());
-        }
-      });
-      if (data.image) {
-        formData.append("image", data.image);
-      }
-      return await apiRequest("POST", "/api/sellers", {
-        body: formData,
-        isFormData: true,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Product added successfully" });
-      setShowAddProductModal(false);
-      resetProductForm();
-    },
-    onError: () => {
-      toast({ title: "Failed to add product", variant: "destructive" });
-    },
-  });
 
   const editProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
@@ -619,8 +592,7 @@ export default function Admin() {
   };
 
   const handleAddProduct = () => {
-    setShowAddProductModal(true);
-    resetProductForm();
+    setLocation("/admin/add-product");
   };
 
   const handleEditProduct = (product: any) => {
@@ -657,8 +629,6 @@ export default function Admin() {
 
     if (editingProduct) {
       editProductMutation.mutate({ id: editingProduct.id, data: formData });
-    } else {
-      addProductMutation.mutate(formData);
     }
   };
 
@@ -1727,205 +1697,6 @@ export default function Admin() {
         </Tabs>
       </div>
 
-      {/* Add Product Modal */}
-      <Dialog open={showAddProductModal} onOpenChange={setShowAddProductModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Add New Product</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-6">
-            {/* Image Upload */}
-            <div className="space-y-4">
-              <Label className="text-lg font-semibold">Product Image</Label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                {productImagePreview ? (
-                  <div className="relative">
-                    <img
-                      src={productImagePreview}
-                      alt="Preview"
-                      className="max-h-48 mx-auto rounded-lg"
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        setProductImageFile(null);
-                        setProductImagePreview("");
-                      }}
-                      className="mt-4"
-                    >
-                      Remove Image
-                    </Button>
-                  </div>
-                ) : (
-                  <div>
-                    <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <p className="text-lg font-medium mb-4">Upload Product Image</p>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleProductImageChange}
-                      className="hidden"
-                      id="product-image-upload"
-                    />
-                    <label htmlFor="product-image-upload">
-                      <Button type="button" variant="outline" asChild>
-                        <span>Choose Image</span>
-                      </Button>
-                    </label>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Product Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="add-name">Product Name *</Label>
-                <Input
-                  id="add-name"
-                  value={productForm.name}
-                  onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., NCERT Math Textbook"
-                  className={productFormErrors.name ? "border-red-500" : ""}
-                />
-                {productFormErrors.name && (
-                  <p className="text-red-500 text-sm mt-1">{productFormErrors.name}</p>
-                )}
-              </div>
-              
-              <div>
-                <Label htmlFor="add-price">Price (₹) *</Label>
-                <Input
-                  id="add-price"
-                  value={productForm.price}
-                  onChange={(e) => setProductForm(prev => ({ ...prev, price: e.target.value }))}
-                  placeholder="299.00"
-                  className={productFormErrors.price ? "border-red-500" : ""}
-                />
-                {productFormErrors.price && (
-                  <p className="text-red-500 text-sm mt-1">{productFormErrors.price}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="add-category">Category *</Label>
-                <Select value={productForm.category} onValueChange={(value) => setProductForm(prev => ({ ...prev, category: value }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Textbook">Textbook</SelectItem>
-                    <SelectItem value="Notebook">Notebook</SelectItem>
-                    <SelectItem value="Stationery">Stationery</SelectItem>
-                    <SelectItem value="Calculator">Calculator</SelectItem>
-                    <SelectItem value="Art Supplies">Art Supplies</SelectItem>
-                    <SelectItem value="Sports Equipment">Sports Equipment</SelectItem>
-                    <SelectItem value="Electronics">Electronics</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="add-condition">Condition *</Label>
-                <Select value={productForm.condition} onValueChange={(value) => setProductForm(prev => ({ ...prev, condition: value }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="New">New</SelectItem>
-                    <SelectItem value="Like New">Like New</SelectItem>
-                    <SelectItem value="Good">Good</SelectItem>
-                    <SelectItem value="Fair">Fair</SelectItem>
-                    <SelectItem value="Poor">Poor</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="add-class">Grade/Class *</Label>
-                <Select value={productForm.class.toString()} onValueChange={(value) => setProductForm(prev => ({ ...prev, class: parseInt(value) }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[6, 7, 8, 9, 10, 11, 12].map((grade) => (
-                      <SelectItem key={grade} value={grade.toString()}>
-                        Grade {grade}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="add-section">Section *</Label>
-                <Input
-                  id="add-section"
-                  value={productForm.section}
-                  onChange={(e) => setProductForm(prev => ({ ...prev, section: e.target.value }))}
-                  placeholder="e.g., A, B, C"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="add-seller-name">Seller Name *</Label>
-                <Input
-                  id="add-seller-name"
-                  value={productForm.sellerName}
-                  onChange={(e) => setProductForm(prev => ({ ...prev, sellerName: e.target.value }))}
-                  placeholder="Full name"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="add-seller-phone">Seller Phone *</Label>
-                <Input
-                  id="add-seller-phone"
-                  value={productForm.sellerPhone}
-                  onChange={(e) => setProductForm(prev => ({ ...prev, sellerPhone: e.target.value }))}
-                  placeholder="9876543210"
-                  className={productFormErrors.sellerPhone ? "border-red-500" : ""}
-                />
-                {productFormErrors.sellerPhone && (
-                  <p className="text-red-500 text-sm mt-1">{productFormErrors.sellerPhone}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="add-description">Description</Label>
-              <Textarea
-                id="add-description"
-                value={productForm.description}
-                onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Describe the product condition, features, etc..."
-                rows={4}
-              />
-            </div>
-
-            <div className="flex space-x-4">
-              <Button
-                onClick={submitProductForm}
-                disabled={addProductMutation.isPending}
-                className="flex-1"
-              >
-                {addProductMutation.isPending ? "Adding..." : "Add Product"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowAddProductModal(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Product Modal */}
       <Dialog open={showEditProductModal} onOpenChange={setShowEditProductModal}>

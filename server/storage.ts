@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Product, type InsertProduct, type Order, type InsertOrder, type Admin, type InsertAdmin, users, products, orders, admins } from "@shared/schema";
+import { type User, type InsertUser, type Product, type InsertProduct, type Order, type InsertOrder, type Admin, type InsertAdmin, type Setting, type InsertSetting, users, products, orders, admins, settings } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -41,6 +41,17 @@ export interface IStorage {
   createAdmin(admin: InsertAdmin): Promise<Admin>;
   updateAdminTotpSecret(id: string, secret: string): Promise<void>;
   setAdminSetup(id: string): Promise<void>;
+
+  // Settings methods
+  getSetting(key: string): Promise<Setting | undefined>;
+  getAllSettings(): Promise<Setting[]>;
+  updateSetting(key: string, value: string, updatedBy?: string): Promise<void>;
+  createSetting(setting: InsertSetting): Promise<Setting>;
+  deleteSetting(key: string): Promise<void>;
+  
+  // Maintenance mode helpers
+  isMaintenanceMode(): Promise<boolean>;
+  setMaintenanceMode(enabled: boolean, updatedBy?: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -48,12 +59,14 @@ export class MemStorage implements IStorage {
   private products: Map<string, Product>;
   private orders: Map<string, Order>;
   private admins: Map<string, Admin>;
+  private settings: Map<string, Setting>;
 
   constructor() {
     this.users = new Map();
     this.products = new Map();
     this.orders = new Map();
     this.admins = new Map();
+    this.settings = new Map();
     this.seedData();
   }
 
@@ -460,6 +473,59 @@ export class MemStorage implements IStorage {
       this.admins.set(id, admin);
     }
   }
+
+  // Settings methods
+  async getSetting(key: string): Promise<Setting | undefined> {
+    return this.settings.get(key);
+  }
+
+  async getAllSettings(): Promise<Setting[]> {
+    return Array.from(this.settings.values());
+  }
+
+  async updateSetting(key: string, value: string, updatedBy?: string): Promise<void> {
+    const existing = this.settings.get(key);
+    if (existing) {
+      existing.value = value;
+      existing.updatedAt = new Date();
+      existing.updatedBy = updatedBy || null;
+      this.settings.set(key, existing);
+    } else {
+      const setting: Setting = {
+        id: randomUUID(),
+        key,
+        value,
+        description: null,
+        updatedAt: new Date(),
+        updatedBy: updatedBy || null,
+      };
+      this.settings.set(key, setting);
+    }
+  }
+
+  async createSetting(setting: InsertSetting): Promise<Setting> {
+    const id = randomUUID();
+    const newSetting: Setting = {
+      ...setting,
+      id,
+      updatedAt: new Date(),
+    };
+    this.settings.set(setting.key, newSetting);
+    return newSetting;
+  }
+
+  async deleteSetting(key: string): Promise<void> {
+    this.settings.delete(key);
+  }
+
+  async isMaintenanceMode(): Promise<boolean> {
+    const setting = await this.getSetting('maintenance_mode');
+    return setting?.value === 'true';
+  }
+
+  async setMaintenanceMode(enabled: boolean, updatedBy?: string): Promise<void> {
+    await this.updateSetting('maintenance_mode', enabled.toString(), updatedBy);
+  }
 }
 
 // Database connection
@@ -856,6 +922,63 @@ export class DbStorage implements IStorage {
 
   async setAdminSetup(id: string): Promise<void> {
     await this.db.update(admins).set({ isSetup: true }).where(eq(admins.id, id));
+  }
+
+  // Settings methods
+  async getSetting(key: string): Promise<Setting | undefined> {
+    const result = await this.db.select().from(settings).where(eq(settings.key, key)).limit(1);
+    return result[0];
+  }
+
+  async getAllSettings(): Promise<Setting[]> {
+    return await this.db.select().from(settings);
+  }
+
+  async updateSetting(key: string, value: string, updatedBy?: string): Promise<void> {
+    const existing = await this.getSetting(key);
+    if (existing) {
+      await this.db.update(settings)
+        .set({ 
+          value, 
+          updatedAt: new Date(), 
+          updatedBy: updatedBy || null 
+        })
+        .where(eq(settings.key, key));
+    } else {
+      const setting: Setting = {
+        id: randomUUID(),
+        key,
+        value,
+        description: null,
+        updatedAt: new Date(),
+        updatedBy: updatedBy || null,
+      };
+      await this.db.insert(settings).values(setting);
+    }
+  }
+
+  async createSetting(setting: InsertSetting): Promise<Setting> {
+    const id = randomUUID();
+    const newSetting: Setting = {
+      ...setting,
+      id,
+      updatedAt: new Date(),
+    };
+    await this.db.insert(settings).values(newSetting);
+    return newSetting;
+  }
+
+  async deleteSetting(key: string): Promise<void> {
+    await this.db.delete(settings).where(eq(settings.key, key));
+  }
+
+  async isMaintenanceMode(): Promise<boolean> {
+    const setting = await this.getSetting('maintenance_mode');
+    return setting?.value === 'true';
+  }
+
+  async setMaintenanceMode(enabled: boolean, updatedBy?: string): Promise<void> {
+    await this.updateSetting('maintenance_mode', enabled.toString(), updatedBy);
   }
 }
 
