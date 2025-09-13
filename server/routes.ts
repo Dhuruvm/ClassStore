@@ -15,6 +15,7 @@ import helmet from "helmet";
 // Modern CSRF protection via Origin/Referer validation
 import path from "path";
 import fs from "fs";
+import axios from "axios";
 
 declare module "express-session" {
   interface SessionData {
@@ -92,7 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const origin = req.get('Origin') || req.get('Referer');
     const allowedOrigins = process.env.NODE_ENV === "production" 
       ? (process.env.ALLOWED_ORIGINS?.split(",") || ["https://classstore.com"])
-      : ["http://localhost:5000", "http://127.0.0.1:5000"];
+      : ["http://localhost:5000", "http://127.0.0.1:5000", `${req.protocol}://${req.get('host')}`];
     
     if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
       if (!origin || !isValidOrigin(origin, allowedOrigins)) {
@@ -232,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else if (recaptchaSecret !== "dummy-secret") {
         try {
-          const axios = require("axios");
+          // Using axios import from top of file
           const recaptchaResponse = await axios.post(
             `https://www.google.com/recaptcha/api/siteverify?secret=${recaptchaSecret}&response=${validatedData.recaptchaToken}`
           );
