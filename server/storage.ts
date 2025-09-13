@@ -859,5 +859,5 @@ export class DbStorage implements IStorage {
   }
 }
 
-// Use database storage instead of memory storage
-export const storage = new DbStorage();
+// Use database storage if DATABASE_URL is provided, otherwise use memory storage
+export const storage = process.env.DATABASE_URL ? new DbStorage() : new MemStorage();
